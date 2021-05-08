@@ -6,3 +6,7 @@ ipch/
 *.opensdf
 *.vcxproj.user
 SCRLog.txt
+
+.vscode
+a.out.*
+source.*
