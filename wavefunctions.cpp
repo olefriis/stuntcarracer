@@ -4,7 +4,7 @@
 /*	============= */
 #include "dxstdafx.h"
 
-#include "WaveFunctions.h"
+#include "wavefunctions.h"
 
 /*********************************************************************************
 /

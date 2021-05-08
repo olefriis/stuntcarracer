@@ -17,7 +17,7 @@
 #include "Car.h"
 #include "Car Behaviour.h"
 #include "Opponent Behaviour.h"
-#include "Wavefunctions.h"
+#include "wavefunctions.h"
 
 
 //-----------------------------------------------------------------------------
