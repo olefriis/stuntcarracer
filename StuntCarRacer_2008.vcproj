@@ -866,14 +866,6 @@
 			RelativePath=".\Sounds\Wreck.wav"
 			>
 		</File>
-		<File
-			RelativePath=".\XBOXController.cpp"
-			>
-		</File>
-		<File
-			RelativePath=".\XBOXController.h"
-			>
-		</File>
 	</Files>
 	<Globals>
 	</Globals>
