@@ -1318,6 +1318,7 @@ long d0, d1, d2;
 	goto ros2;
 
 ros1:
+{
 	d2 = opponents_current_piece;
 	if (opponents_speed_values[TrackID][d2] < 0)
 		goto ros2;
@@ -1345,7 +1346,7 @@ ros1:
 		goto ros2;
 
 	B1bbbe[2] = 16;	//opponents.random.steering.count
-
+}
 ros2:
 	d0 = Track[opponents_current_piece].oppositeDirection ? 0x40 : 0;
 	d0 ^= Track[opponents_current_piece].type;
@@ -1709,6 +1710,7 @@ long d0, d3, d4;
 		goto ctccd2;
 
 ctccd1:
+{
 	long players_smaller_y = player_y >> 11;
 	d0 = players_smaller_y - opp_actual_height[REAR_LEFT];
 	d4 = d0;
@@ -1731,7 +1733,7 @@ ctccd1:
 
 	d3 <<= 4;
 	car_to_car_y_acceleration = d3;
-
+}
 ctccd2:
 	d0 = x_difference;
 	if (d0 >= 45)
@@ -2016,6 +2018,7 @@ far_away:
 	opponents_suggested_road_x_position = d2;
 
 opic:
+{
 	// move opponent to middle of road if approaching or on a curve
 	long count, piece = opponents_current_piece;
 	for (count = 2; count > 0; count--)
@@ -2028,7 +2031,7 @@ opic:
 		// go to next piece
 		piece++; if (piece > (NumTrackPieces - 1)) piece = 0;
 	}
-
+}
 opif:
 	d0 = B1bbbd;
 	if (d0 < 0) goto opi10;

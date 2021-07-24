@@ -2480,6 +2480,7 @@ on_draw_bridge:	// player or opponent are on Draw Bridge section, or opponent is
 	goto set_opponent_approach_speed;
 
 not_on_draw_bridge:	// neither player or opponent are on Draw Bridge section
+{
 	draw_bridge_frame_count++;	// draw bridge does move in this case
 	on_draw_bridge_offset = 0;
 
@@ -2523,6 +2524,7 @@ not_on_draw_bridge:	// neither player or opponent are on Draw Bridge section
 		return;
 
 	f = draw_bridge_frame_count;
+}
 
 	// Set opponent's required speed values for approaching the Draw Bridge
 set_opponent_approach_speed:
