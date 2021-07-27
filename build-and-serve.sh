@@ -12,5 +12,8 @@ emcc \
  Track.cpp \
  wavefunctions.cpp \
  Backdrop.cpp \
- -ferror-limit=1000 -o source.html
+ Substitutes/*.cpp \
+ -ferror-limit=1000 \
+ -o source.html \
+ --embed-file Tracks
 python -m SimpleHTTPServer

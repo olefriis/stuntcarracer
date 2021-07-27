@@ -1,6 +1,7 @@
 // Stub functions enabling us to compile the project.
 
 #include "dxstdafx.h"
+#include <fstream>
 
 /*
  * CDXUTTextHelper
@@ -267,26 +268,6 @@ CONST D3DSURFACE_DESC * DXUTGetBackBufferSurfaceDesc() {
   puts("DXUTGetBackBufferSurfaceDesc");
   return 0;
 }
-
-
-/*
- * Resource loading. See https://docs.microsoft.com/en-us/windows/win32/menurc/using-resources
- */
-HRSRC FindResource( HMODULE hModule, LPCWSTR lpName, LPCWSTR lpType ) {
-  puts("FindResource");
-  return null;
-}
-
-HGLOBAL LoadResource( HMODULE hModule, HRSRC hResInfo ) {
-  puts("LoadResource");
-  return null;
-}
-
-LPVOID LockResource( HGLOBAL hResData ) {
-  puts("LockResource");
-  return null;
-}
-
 
 HRESULT StringCchPrintf( LPTSTR pszDest, size_t cchDest, LPCTSTR pszFormat, ... ) {
   puts("StringCchPrintf");
