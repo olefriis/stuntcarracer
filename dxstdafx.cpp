@@ -2,6 +2,8 @@
 
 #include "dxstdafx.h"
 #include <fstream>
+#include <GLES2/gl2.h>
+#include <EGL/egl.h>
 
 /*
  * CDXUTTextHelper
@@ -28,15 +30,6 @@ HRESULT CDXUTTextHelper::DrawTextLine( const WCHAR* strMsg ) {
 }
 void CDXUTTextHelper::End() {
   puts("CDXUTTextHelper::End");
-}
-
-HRESULT DirectSoundCreate8(
-         LPCGUID lpcGuidDevice,
-         LPDIRECTSOUND8 * ppDS8,
-         LPUNKNOWN pUnkOuter
-) {
-  puts("DirectSoundCreate8");
-  return S_OK;
 }
 
 HRESULT D3DXCreateSprite(
@@ -244,8 +237,14 @@ void DXUTSetCursorSettings( bool bShowCursorWhenFullScreen, bool bClipCursorWhen
   puts("DXUTSetCursorSettings");
 }
 
+// This stuff is copied from the "glbook" code from emscripten's source code repo
+#include "Substitutes/esUtil.h"
+static ESContext esContext;
+
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
   puts("DXUTCreateWindow");
+
+  esCreateWindow(&esContext, "Stunt Car Racer", 320, 240, ES_WINDOW_RGB);
   return S_OK;
 }
 

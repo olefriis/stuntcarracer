@@ -13,6 +13,7 @@ emcc \
  wavefunctions.cpp \
  Backdrop.cpp \
  Substitutes/*.cpp \
+ Substitutes/*.c \
  -ferror-limit=1000 \
  -o source.html \
  --embed-file Tracks

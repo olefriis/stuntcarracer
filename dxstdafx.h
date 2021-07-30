@@ -489,14 +489,6 @@ typedef struct POINT {
   FLOAT x;
   FLOAT y;
 } POINT;
-class IDirectSound8 {
-  public:
-  virtual HRESULT SetCooperativeLevel(
-         HWND hwnd,
-         DWORD dwLevel
-  );
-  virtual void Release();
-};
 class ID3DXFont {
   public:
   virtual HRESULT OnResetDevice();
@@ -558,7 +550,6 @@ public:
 
 // Bogus types
 typedef unsigned int LPCGUID;
-typedef IDirectSound8 *LPDIRECTSOUND8;
 typedef unsigned int LPUNKNOWN;
 typedef struct D3DSURFACE_DESC {
   UINT Width;
@@ -566,11 +557,7 @@ typedef struct D3DSURFACE_DESC {
 } D3DSURFACE_DESC;
 
 // DirectX functions
-HRESULT DirectSoundCreate8(
-    LPCGUID lpcGuidDevice,
-    LPDIRECTSOUND8 * ppDS8,
-    LPUNKNOWN pUnkOuter
-);
+#include "Substitutes/Sound.h"
 
 HRESULT D3DXCreateSprite(
   LPDIRECT3DDEVICE9 pDevice,
