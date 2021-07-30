@@ -16,5 +16,5 @@
 
 IDirectSoundBuffer8* MakeSoundBuffer(IDirectSound8 *ds, LPCWSTR lpSampleName)
 	{
-	return (IDirectSoundBuffer8 *) null;
+	return new IDirectSoundBuffer8();
 	}

@@ -473,18 +473,6 @@ class IDirect3D9 {
   );
 };
 
-#define DSBPLAY_LOOPING 1L
-class IDirectSoundBuffer8 {
-  public:
-  virtual HRESULT SetPan( LONG lPan );
-  virtual HRESULT SetVolume( LONG lVolume );
-  virtual HRESULT SetFrequency( DWORD dwFrequency );
-  virtual HRESULT SetCurrentPosition( DWORD dwNewPosition );
-  virtual HRESULT Play( DWORD dwReserved1, DWORD dwPriority, DWORD dwFlags );
-  virtual HRESULT Stop();
-  virtual HRESULT GetCurrentPosition( LPDWORD pdwCurrentPlayCursor, LPDWORD pdwCurrentWriteCursor );
-  virtual void Release();
-};
 typedef struct POINT {
   FLOAT x;
   FLOAT y;
