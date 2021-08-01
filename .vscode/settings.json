@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "iostream": "cpp",
+    "iosfwd": "cpp",
+    "ios": "cpp"
+  },
+  "editor.detectIndentation": false,
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4
+}

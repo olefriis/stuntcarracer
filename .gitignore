@@ -7,6 +7,5 @@ ipch/
 *.vcxproj.user
 SCRLog.txt
 
-.vscode
 a.out.*
 source.*
