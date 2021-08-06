@@ -1643,6 +1643,10 @@ INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int )
 	if (!DSSetMode())
 		return FALSE;
 
+	/*
+	 * Since the JavaScript callback model doesn't allow us to have a method that just loops forever, the game is modelled
+	 * around getting callbacks from Emscripten. Thus, we should _not_ clean up and exit here.
+
     // Start the render loop
     DXUTMainLoop();
 
@@ -1650,4 +1654,8 @@ INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int )
 	FreeData();
 
     return DXUTGetExitCode();
+
+	 * Instead, return TRUE so that our actual main function knows that this set-up was successful.
+	 */
+	return TRUE;
 }

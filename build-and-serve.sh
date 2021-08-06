@@ -17,4 +17,7 @@ emcc \
  -ferror-limit=1000 \
  -o source.html \
  --embed-file Tracks
+
+echo 'Build succeeded. Now serving the result on http://localhost:8000/source.html'
+
 python -m SimpleHTTPServer

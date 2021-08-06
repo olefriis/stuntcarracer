@@ -70,11 +70,6 @@ IDirect3D9* DXUTGetD3DObject() {
   return NULL;
 }
 
-IDirect3DDevice9* DXUTGetD3DDevice() {
-  puts("DXUTGetD3DDevice");
-  return NULL;
-}
-
 double DXUTGetTime() {
   puts("DXUTGetTime");
   return 0;
@@ -190,39 +185,6 @@ int MessageBox(
   return 0;
 }
 
-void DXUTSetCallbackDeviceCreated( LPDXUTCALLBACKDEVICECREATED pCallbackDeviceCreated, void* pUserContext ) {
-  puts("DXUTSetCallbackDeviceCreated");
-}
-void DXUTSetCallbackDeviceReset( LPDXUTCALLBACKDEVICERESET pCallbackDeviceReset, void* pUserContext ) {
-  puts("DXUTSetCallbackDeviceReset");
-}
-void DXUTSetCallbackDeviceLost( LPDXUTCALLBACKDEVICELOST pCallbackDeviceLost, void* pUserContext ) {
-  puts("DXUTSetCallbackDeviceLost");
-}
-void DXUTSetCallbackDeviceDestroyed( LPDXUTCALLBACKDEVICEDESTROYED pCallbackDeviceDestroyed, void* pUserContext ) {
-  puts("DXUTSetCallbackDeviceDestroyed");
-}
-void DXUTSetCallbackDeviceChanging( LPDXUTCALLBACKMODIFYDEVICESETTINGS pCallbackModifyDeviceSettings, void* pUserContext ) {
-  puts("DXUTSetCallbackDeviceChanging");
-}
-
-void DXUTSetCallbackFrameMove( LPDXUTCALLBACKFRAMEMOVE pCallbackFrameMove, void* pUserContext ) {
-  puts("DXUTSetCallbackFrameMove");
-}
-void DXUTSetCallbackFrameRender( LPDXUTCALLBACKFRAMERENDER pCallbackFrameRender, void* pUserContext ) {
-  puts("DXUTSetCallbackFrameRender");
-}
-
-void DXUTSetCallbackKeyboard( LPDXUTCALLBACKKEYBOARD pCallbackKeyboard, void* pUserContext ) {
-  puts("DXUTSetCallbackKeyboard");
-}
-void DXUTSetCallbackMouse( LPDXUTCALLBACKMOUSE pCallbackMouse, bool bIncludeMouseMove, void* pUserContext ) {
-  puts("DXUTSetCallbackMouse");
-}
-void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUserContext ) {
-  puts("DXUTSetCallbackMsgProc");
-}
-
 int DXUTGetExitCode() {
   puts("DXUTGetExitCode");
   return 0;
@@ -237,17 +199,6 @@ void DXUTSetCursorSettings( bool bShowCursorWhenFullScreen, bool bClipCursorWhen
   puts("DXUTSetCursorSettings");
 }
 
-// This stuff is copied from the "glbook" code from emscripten's source code repo
-#include "Substitutes/esUtil.h"
-static ESContext esContext;
-
-HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
-  puts("DXUTCreateWindow");
-
-  esCreateWindow(&esContext, "Stunt Car Racer", 320, 240, ES_WINDOW_RGB);
-  return S_OK;
-}
-
 HRESULT DXUTCreateDevice( UINT AdapterOrdinal, bool bWindowed, 
                           int nSuggestedWidth, int nSuggestedHeight,
                           LPDXUTCALLBACKISDEVICEACCEPTABLE pCallbackIsDeviceAcceptable,
@@ -255,12 +206,6 @@ HRESULT DXUTCreateDevice( UINT AdapterOrdinal, bool bWindowed,
                           void* pUserContext ) {
   puts("DXUTCreateDevice");
   return S_OK;
-}
-
-// Maybe this should have been a macro?
-D3DCOLOR D3DCOLOR_XRGB( int r, int g, int b ) {
-  puts("D3DCOLOR_XRGB");
-  return 0;
 }
 
 CONST D3DSURFACE_DESC * DXUTGetBackBufferSurfaceDesc() {
@@ -273,17 +218,3 @@ HRESULT StringCchPrintf( LPTSTR pszDest, size_t cchDest, LPCTSTR pszFormat, ... 
   return S_OK;
 }
 
-
-HRESULT DXUTMainLoop() {
-  puts("DXUTMainLoop");
-  return S_OK;
-}
-
-// Implemented in StuntCarRacer.cpp
-INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int );
-
-int main() {
-  puts("Main function!");
-  WinMain( NULL, NULL, NULL, NULL );
-	return 0;
-}
