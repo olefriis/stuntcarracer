@@ -88,11 +88,8 @@ int main() {
 
 	if (deviceResetCallback) {
 		puts("Resetting device");
-		D3DSURFACE_DESC surfaceDescription;
-		surfaceDescription.Width = getCurrentWindowWidth();
-		surfaceDescription.Height = getCurrentWindowHeight();
 
-		HRESULT resetDeviceResult = deviceResetCallback(DXUTGetD3DDevice(), &surfaceDescription, null);
+		HRESULT resetDeviceResult = deviceResetCallback(DXUTGetD3DDevice(), DXUTGetBackBufferSurfaceDesc(), null);
 		if (resetDeviceResult != S_OK) {
 			printf("Device reset callback returned failure code %ld\n", resetDeviceResult);
 			return resetDeviceResult;

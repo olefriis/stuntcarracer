@@ -1,4 +1,5 @@
 #include "../dxstdafx.h"
+#include "esUtil.h"
 
 HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMATRIX *pMatrix) {
 	puts("IDirect3DDevice9::SetTransform");
@@ -31,8 +32,27 @@ HRESULT IDirect3DDevice9::EndScene() {
 }
 
 HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags, D3DCOLOR Color, float Z, DWORD Stencil) {
-	puts("IDirect3DDevice9::Clear");
-	return S_OK;
+	printf("IDirect3DDevice9::Clear(count=%ld, Color=%ld)\n", Count, Color);
+	if (Flags == D3DCLEAR_ZBUFFER) {
+		glClear ( GL_DEPTH_BUFFER_BIT );
+		return S_OK;
+	} else if (Flags == D3DCLEAR_TARGET) {
+		glEnable(GL_SCISSOR_TEST);
+		GLclampf red = ((Color >> 16) & 0xFF) / 255.0f;
+		GLclampf green = ((Color >> 8) & 0xFF) / 255.0f;
+		GLclampf blue = ((Color) & 0xFF) / 255.0f;
+		glClearColor(red, green, blue, 0xFF);
+		for (int i = 0; i < Count; i++) {
+			D3DRECT rect = pRects[i];
+			glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+			glClear(GL_COLOR_BUFFER_BIT);
+		}
+		glDisable(GL_SCISSOR_TEST);
+		return S_OK;
+	}
+
+	printf("Unknown flag: %ld", Flags);
+	return E_FAIL;
 }
 
 HRESULT IDirect3DDevice9::CreateVertexBuffer(UINT Length, DWORD Usage, DWORD FVF, D3DPOOL Pool, IDirect3DVertexBuffer9 **ppVertexBuffer, HANDLE *pSharedHandle) {
