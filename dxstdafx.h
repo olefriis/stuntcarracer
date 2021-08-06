@@ -171,22 +171,6 @@ typedef enum D3DTEXTUREOP {
   D3DTOP_FORCE_DWORD                = 0x7fffffff
 } D3DTEXTUREOP, *LPD3DTEXTUREOP;
 
-// A bunch of types I've just made up to make stuff compile a bit.
-// They for sure won't work, but their use will have to be changed to something more HTML-friendly anyway.
-
-typedef struct _D3DMATRIX {
-    union {
-        struct {
-            float        _11, _12, _13, _14;
-            float        _21, _22, _23, _24;
-            float        _31, _32, _33, _34;
-            float        _41, _42, _43, _44;
-
-        };
-        float m[4][4];
-    };
-} D3DMATRIX;
-
 #include "Substitutes/Direct3DVertexBuffer.h"
 
 typedef struct D3DCAPS9 {
@@ -206,6 +190,20 @@ class IDirect3DTexture9 : public IDirect3DBaseTexture9 {
 };
 typedef IDirect3DTexture9 *LPDIRECT3DTEXTURE9;
 
+typedef struct D3DVECTOR {
+  FLOAT x;
+  FLOAT y;
+  FLOAT z;
+} D3DVECTOR, *LPD3DXVECTOR3;
+
+typedef struct D3DXVECTOR3 : public D3DVECTOR
+{
+public:
+    D3DXVECTOR3() {};
+    D3DXVECTOR3( FLOAT x, FLOAT y, FLOAT z ) {};
+} D3DXVECTOR3;
+
+#include "Substitutes/Matrix.h"
 #include "Substitutes/Direct3DDevice.h"
 typedef struct DXUTDeviceSettings {
   D3DDEVTYPE DeviceType;
@@ -238,11 +236,6 @@ class ID3DXSprite {
   virtual void Release();
 };
 typedef ID3DXSprite *LPD3DXSPRITE;
-typedef struct D3DVECTOR {
-  FLOAT x;
-  FLOAT y;
-  FLOAT z;
-} D3DVECTOR, *LPD3DXVECTOR3;
 typedef struct tagRECT { 
     LONG    left;    // This is the upper-left corner x-coordinate.
     LONG    top;     // The upper-left corner y-coordinate.
@@ -273,17 +266,6 @@ protected:
     D3DXCOLOR m_clr;
     POINT m_pt;
 };
-typedef struct D3DXVECTOR3 : public D3DVECTOR
-{
-public:
-    D3DXVECTOR3() {};
-    D3DXVECTOR3( FLOAT x, FLOAT y, FLOAT z ) {};
-} D3DXVECTOR3;
-typedef struct D3DXMATRIX : public D3DMATRIX
-{
-public:
-    D3DXMATRIX() {};
-} D3DXMATRIX, *LPD3DXMATRIX;
 
 // Bogus types
 typedef unsigned int LPCGUID;
@@ -307,8 +289,6 @@ HRESULT D3DXCreateTextureFromResource(
   LPCTSTR            pSrcResource,
   LPDIRECT3DTEXTURE9 *ppTexture
 );
-
-#include "Substitutes/Matrix.h"
 
 HWND DXUTGetHWND();
 

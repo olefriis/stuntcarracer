@@ -104,8 +104,6 @@ HRESULT D3DXCreateFont(
   return S_OK;
 }
 
-#include "Substitutes/Matrix.h"
-
 int MessageBox(
   HWND    hWnd,
   LPCTSTR lpText,
