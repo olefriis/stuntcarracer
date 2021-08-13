@@ -240,6 +240,10 @@ D3DXMATRIX* D3DXMatrixTranslation(
 	return pOut;
 }
 
+void PrintVector(const char *name, const D3DXVECTOR3 *v) {
+	printf("%s: {%f, %f, %f}\n", name, v->x, v->y, v->z);
+}
+
 D3DXMATRIX* D3DXMatrixLookAtLH(
   D3DXMATRIX  *pOut,
   const D3DXVECTOR3 *pEye,
@@ -247,6 +251,9 @@ D3DXMATRIX* D3DXMatrixLookAtLH(
   const D3DXVECTOR3 *pUp
 ) {
 	puts("D3DXMatrixLookAtLH");
+	PrintVector("pEye", pEye);
+	PrintVector("pAt", pAt);
+	PrintVector("pUp", pUp);
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixlookatlh
 

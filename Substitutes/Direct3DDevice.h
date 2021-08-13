@@ -1,14 +1,6 @@
 typedef enum D3DTRANSFORMSTATETYPE { 
 	D3DTS_VIEW         = 2,
 	D3DTS_PROJECTION   = 3,
-	D3DTS_TEXTURE0     = 16,
-	D3DTS_TEXTURE1     = 17,
-	D3DTS_TEXTURE2     = 18,
-	D3DTS_TEXTURE3     = 19,
-	D3DTS_TEXTURE4     = 20,
-	D3DTS_TEXTURE5     = 21,
-	D3DTS_TEXTURE6     = 22,
-	D3DTS_TEXTURE7     = 23,
 
 	// I made this up. No idea how it's actually implemented
 	D3DTS_WORLD        = 24,
@@ -184,13 +176,11 @@ typedef enum D3DPOOL {
 #define D3DUSAGE_WRITEONLY 1
 
 typedef enum D3DPRIMITIVETYPE { 
-	D3DPT_POINTLIST      = 1,
 	D3DPT_LINELIST       = 2,
 	D3DPT_LINESTRIP      = 3,
 	D3DPT_TRIANGLELIST   = 4,
 	D3DPT_TRIANGLESTRIP  = 5,
 	D3DPT_TRIANGLEFAN    = 6,
-	D3DPT_FORCE_DWORD    = 0x7fffffff
 } D3DPRIMITIVETYPE, *LPD3DPRIMITIVETYPE;
 
 class IDirect3DDevice9 {
@@ -244,6 +234,14 @@ class IDirect3DDevice9 {
     UINT             StartVertex,
     UINT             PrimitiveCount
   );
+
+  private:
+  D3DXMATRIX viewMatrix;
+  D3DXMATRIX worldMatrix;
+  D3DXMATRIX projectionMatrix;
+  IDirect3DVertexBuffer9 *currentStreamSource;
+  UINT currentStride;
+  DWORD currentFvf;
 };
 typedef IDirect3DDevice9 *LPDIRECT3DDEVICE9;
 typedef IDirect3DDevice9 *PDIRECT3DDEVICE9;

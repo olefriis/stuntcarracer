@@ -8,6 +8,7 @@ HRESULT IDirect3DVertexBuffer9::Lock( UINT  OffsetToLock, UINT  SizeToLock, void
 	puts("IDirect3DVertexBuffer9::Lock");
 
 	*ppbData = (void *) ((UINT) data + OffsetToLock);
+	length = SizeToLock;
 
 	return S_OK;
 }

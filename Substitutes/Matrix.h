@@ -1,3 +1,5 @@
+#include <GLES2/gl2.h>
+
 typedef struct _D3DMATRIX {
     union {
         struct {
@@ -8,6 +10,7 @@ typedef struct _D3DMATRIX {
 
         };
         float m[4][4];
+		GLfloat glFloats[16];
     };
 } D3DMATRIX;
 
