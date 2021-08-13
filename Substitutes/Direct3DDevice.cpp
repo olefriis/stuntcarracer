@@ -197,43 +197,6 @@ void DrawDummyTriangle() {
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
 	puts("IDirect3DDevice9::DrawPrimitive");
 
-	// Calling `glLoadMatrixf` below requires setting the `-s LEGACY_GL_EMULATION=1` during build
-	// time, as it is part of emscripten's legacy GL emulation. If we could do this another way,
-	// that would be great.
-	//
-	// See https://emscripten.org/docs/porting/multimedia_and_graphics/OpenGL-support.html
-
-	// We could optimize this a great deal by only setting the matrices if they have actually been
-	// changed through calls to `SetTransform`. But that's for another day.
-
-	/*glMatrixMode(GL_MODELVIEW);
-	D3DXMATRIX modelViewMatrix;
-	D3DXMatrixMultiply(&modelViewMatrix, &this->viewMatrix, &this->worldMatrix);
-	glLoadMatrixf(modelViewMatrix.glFloats);
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadMatrixf(projectionMatrix.glFloats);*/
-
-	/*glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	gluLookAt(33471.000000, 12288.000000, 90105.000000, // eye
-		32768.000000, 0.000000, 32768.000000, // center
-		0.000000, 1.000000, 0.000000); // up
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(45.0f, 1.0f, 0.1f, 100000.0f);*/
-
-	//glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
-	//gluLookAt(10, 10, 10, // eye
-	//	0, 0, 0, // center
-	//	0, 1, 0); // up
-
-	/*glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(45.0f, 1.0f, 0.1f, 100000.0f);*/
-
 	switch (PrimitiveType) {
 		case D3DPT_LINELIST:
 		break;

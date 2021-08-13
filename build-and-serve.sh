@@ -15,7 +15,6 @@ emcc \
  Substitutes/*.cpp \
  Substitutes/*.c \
  -ferror-limit=1000 \
- -s LEGACY_GL_EMULATION=1 \
  -o source.html \
  --embed-file Tracks
 
