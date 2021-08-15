@@ -23,6 +23,7 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
   FLOAT      zf
 ) {
 	puts("D3DXMatrixPerspectiveFovLH");
+	printf("fovy: %f, Aspect: %f, zn: %f, zf: %f\n", fovy, Aspect, zn, zf);
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixperspectivefovlh
 	double yScale = cotan(fovy/2);
@@ -44,12 +45,12 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
 	pOut->_31 = 0;
 	pOut->_32 = 0;
 	pOut->_33 = zf / (zf - zn);
-	pOut->_34 = 1;
+	pOut->_34 = -1; // Do a right-handed perspective, despite the fact that this method is for left-handed perspective...
 
 	// Row 4
 	pOut->_41 = 0;
 	pOut->_42 = 0;
-	pOut->_43 = -zn*zf / (zf - zn);
+	pOut->_43 = 2*zn*zf / (zf - zn); // '2*' added to make it fit into the OpenGL 2x2x2 visible cube
 	pOut->_44 = 0;
 
 	return pOut;

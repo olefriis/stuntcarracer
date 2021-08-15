@@ -3,11 +3,17 @@
 typedef struct _D3DMATRIX {
     union {
         struct {
-            float        _11, _12, _13, _14;
-            float        _21, _22, _23, _24;
-            float        _31, _32, _33, _34;
-            float        _41, _42, _43, _44;
+			// Direct3D packs the floats "row-first":
+            //float        _11, _12, _13, _14;
+            //float        _21, _22, _23, _24;
+            //float        _31, _32, _33, _34;
+            //float        _41, _42, _43, _44;
 
+			// However, pack the floats "column-first", since that's the way OpenGL expects them
+            float        _11, _21, _31, _41;
+            float        _12, _22, _32, _42;
+            float        _13, _23, _33, _43;
+            float        _14, _24, _34, _44;
         };
         float m[4][4];
 		GLfloat glFloats[16];

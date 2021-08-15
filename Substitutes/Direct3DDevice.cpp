@@ -180,12 +180,6 @@ void DrawDummyTriangle() {
 	const D3DSURFACE_DESC *surfaceDescription = DXUTGetBackBufferSurfaceDesc();
 	glViewport(0, 0, surfaceDescription->Width, surfaceDescription->Height);
    
-   // Clear the color buffer
-   glClear ( GL_COLOR_BUFFER_BIT );
-
-   // Use the program object
-   //glUseProgram ( userData->programObject );
-
    // Load the vertex data
    glBindBuffer(GL_ARRAY_BUFFER, vertexPosObject);
    glVertexAttribPointer(0 /* ? */, 3, GL_FLOAT, 0, 0, 0);
@@ -212,17 +206,18 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 		{
 			//PrintMatrix("View matrix", &this->viewMatrix);
 			//PrintMatrix("World matrix", &this->worldMatrix);
-			//PrintMatrix("Model view matrix", &modelViewMatrix);
-			//PrintMatrix("Projection matrix", &this->projectionMatrix);
+			PrintMatrix("Projection matrix", &this->projectionMatrix);
 
 			// This is used for drawing the track
 			const char *vShaderStr =
 				"uniform mat4 projectionMatrix;\n"
 				"uniform mat4 viewMatrix;\n"
 				"uniform mat4 worldMatrix;\n"
-				"attribute vec4 vPosition;\n"
+				"attribute vec3 vPosition;\n"
 				"void main() {\n"
-				"   gl_Position = vPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
+				"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
+				"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
+				"   gl_Position = transformedPosition / transformedPosition.w;\n"
 				"}\n";
 			GLuint vertexShader = LoadShader ( GL_VERTEX_SHADER, vShaderStr );
 
@@ -270,11 +265,12 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			// Very temporary very hack: Shrink the track and move it a bit to the left so that we can see it
 			for (int i=0; i<3*PrimitiveCount; i++) {
 				POINT3D *p = (POINT3D *)((int) currentStreamSource->data + i*currentStride);
-				int divideBy = 50000;
+				int divideBy = 2500;
 				p->x /= divideBy;
 				p->y /= divideBy;
 				p->z /= divideBy;
-				p->x -= 0.5;
+				p->x -= 15.0;
+				p->z -= 30.0;
 				if (i < 10) {
 					printf("%d: (%f, %f, %f)\n", i, p->x, p->y, p->z);
 					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride)));
@@ -286,10 +282,10 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			D3DXMATRIX identity;
 			D3DXMatrixIdentity(&identity);
 			// Load the matrices
-			//glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
 			//glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
 			//glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
-			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
+			//glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
 			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
 
@@ -301,13 +297,6 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			printf("length: %ld\n", currentStreamSource->length);
 			printf("currentStride: %d", currentStride);
 			glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
-
-			// Set the viewport
-			//const D3DSURFACE_DESC *surfaceDescription = DXUTGetBackBufferSurfaceDesc();
-			//glViewport(0, 0, surfaceDescription->Width, surfaceDescription->Height);
-
-			// Clear the color buffer
-			//glClear ( GL_COLOR_BUFFER_BIT );
 
 			glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
