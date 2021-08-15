@@ -2,13 +2,13 @@
 
 IDirect3DVertexBuffer9::IDirect3DVertexBuffer9(UINT Length) {
 	data = malloc(Length);
+	length = Length;
 }
 
 HRESULT IDirect3DVertexBuffer9::Lock( UINT  OffsetToLock, UINT  SizeToLock, void  **ppbData, DWORD Flags ) {
 	puts("IDirect3DVertexBuffer9::Lock");
 
 	*ppbData = (void *) ((UINT) data + OffsetToLock);
-	length = SizeToLock;
 
 	return S_OK;
 }

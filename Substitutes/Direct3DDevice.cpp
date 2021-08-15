@@ -194,6 +194,12 @@ void DrawDummyTriangle() {
    glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
 
+typedef struct POINT3D {
+	GLfloat x;
+	GLfloat y;
+	GLfloat z;
+};
+
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
 	puts("IDirect3DDevice9::DrawPrimitive");
 
@@ -216,7 +222,7 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 				"uniform mat4 worldMatrix;\n"
 				"attribute vec4 vPosition;\n"
 				"void main() {\n"
-				"   gl_Position = projectionMatrix * viewMatrix * worldMatrix * vPosition;\n"
+				"   gl_Position = vPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
 				"}\n";
 			GLuint vertexShader = LoadShader ( GL_VERTEX_SHADER, vShaderStr );
 
@@ -261,6 +267,22 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 
 			glUseProgram ( programObject );
 
+			// Very temporary very hack: Shrink the track and move it a bit to the left so that we can see it
+			for (int i=0; i<3*PrimitiveCount; i++) {
+				POINT3D *p = (POINT3D *)((int) currentStreamSource->data + i*currentStride);
+				int divideBy = 50000;
+				p->x /= divideBy;
+				p->y /= divideBy;
+				p->z /= divideBy;
+				p->x -= 0.5;
+				if (i < 10) {
+					printf("%d: (%f, %f, %f)\n", i, p->x, p->y, p->z);
+					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride)));
+					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride + 4)));
+					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride + 8)));
+				}
+			}
+
 			D3DXMATRIX identity;
 			D3DXMatrixIdentity(&identity);
 			// Load the matrices
@@ -271,7 +293,14 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
 
-			DrawDummyTriangle();
+			//DrawDummyTriangle();
+
+			unsigned int VBO;
+			glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
+			glBindBuffer(GL_ARRAY_BUFFER, VBO);
+			printf("length: %ld\n", currentStreamSource->length);
+			printf("currentStride: %d", currentStride);
+			glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
 
 			// Set the viewport
 			//const D3DSURFACE_DESC *surfaceDescription = DXUTGetBackBufferSurfaceDesc();
@@ -280,12 +309,8 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			// Clear the color buffer
 			//glClear ( GL_COLOR_BUFFER_BIT );
 
-			unsigned int VBO;
-			glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
-			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-			glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
-
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, (void*)0);
+			glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
 			glEnableVertexAttribArray(0);
 
 			printf("Drawing %d triangles\n", PrimitiveCount);
