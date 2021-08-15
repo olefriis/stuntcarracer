@@ -204,8 +204,8 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 		break;
 		case D3DPT_TRIANGLELIST:
 		{
-			//PrintMatrix("View matrix", &this->viewMatrix);
-			//PrintMatrix("World matrix", &this->worldMatrix);
+			PrintMatrix("View matrix", &this->viewMatrix);
+			PrintMatrix("World matrix", &this->worldMatrix);
 			PrintMatrix("Projection matrix", &this->projectionMatrix);
 
 			// This is used for drawing the track
@@ -262,32 +262,12 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 
 			glUseProgram ( programObject );
 
-			// Very temporary very hack: Shrink the track and move it a bit to the left so that we can see it
-			for (int i=0; i<3*PrimitiveCount; i++) {
-				POINT3D *p = (POINT3D *)((int) currentStreamSource->data + i*currentStride);
-				int divideBy = 2500;
-				p->x /= divideBy;
-				p->y /= divideBy;
-				p->z /= divideBy;
-				p->x -= 15.0;
-				p->z -= 30.0;
-				if (i < 10) {
-					printf("%d: (%f, %f, %f)\n", i, p->x, p->y, p->z);
-					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride)));
-					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride + 4)));
-					printf("%f\n", *((GLfloat*) ((int)currentStreamSource->data + i*currentStride + 8)));
-				}
-			}
-
 			D3DXMATRIX identity;
 			D3DXMatrixIdentity(&identity);
 			// Load the matrices
 			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
-			//glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
-			//glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
-			//glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
-			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&identity.glFloats[0]);
+			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
 
 			//DrawDummyTriangle();
 

@@ -45,7 +45,7 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
 	pOut->_31 = 0;
 	pOut->_32 = 0;
 	pOut->_33 = zf / (zf - zn);
-	pOut->_34 = -1; // Do a right-handed perspective, despite the fact that this method is for left-handed perspective...
+	pOut->_34 = 1;
 
 	// Row 4
 	pOut->_41 = 0;
