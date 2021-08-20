@@ -185,6 +185,8 @@ typedef enum D3DPRIMITIVETYPE {
 
 class IDirect3DDevice9 {
   public:
+  IDirect3DDevice9(); // Only for our own use
+
   HRESULT SetTransform(
     D3DTRANSFORMSTATETYPE State,
     const D3DMATRIX       *pMatrix
@@ -236,6 +238,7 @@ class IDirect3DDevice9 {
   );
 
   private:
+  void DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UINT PrimitiveCount);
   D3DXMATRIX viewMatrix;
   D3DXMATRIX worldMatrix;
   D3DXMATRIX projectionMatrix;

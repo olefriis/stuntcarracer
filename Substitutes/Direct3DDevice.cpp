@@ -15,6 +15,114 @@ void PrintMatrix(const char *name, const D3DMATRIX *m) {
 	printf("\n");
 }
 
+///
+// Create a shader object, load the shader source, and
+// compile the shader.
+//
+GLuint LoadShader ( GLenum type, const char *shaderSrc )
+{
+   GLuint shader;
+   GLint compiled;
+   
+   // Create the shader object
+   shader = glCreateShader ( type );
+
+   if ( shader == 0 )
+   	return 0;
+
+   // Load the shader source
+   glShaderSource ( shader, 1, &shaderSrc, NULL );
+   
+   // Compile the shader
+   glCompileShader ( shader );
+
+   // Check the compile status
+   glGetShaderiv ( shader, GL_COMPILE_STATUS, &compiled );
+
+   if ( !compiled ) 
+   {
+      GLint infoLen = 0;
+
+      glGetShaderiv ( shader, GL_INFO_LOG_LENGTH, &infoLen );
+      
+      if ( infoLen > 1 )
+      {
+         char* infoLog = (char *)malloc (sizeof(char) * infoLen );
+
+         glGetShaderInfoLog ( shader, infoLen, NULL, infoLog );
+         esLogMessage ( "Error compiling shader:\n%s\n", infoLog );            
+         
+         free ( infoLog );
+      }
+
+      glDeleteShader ( shader );
+      return 0;
+   }
+
+   return shader;
+}
+
+static GLuint programObjectForXyzDiffuseTexture = 0;
+static GLint projectionMatrixLocationForXyzDiffuseTexture;
+static GLint viewMatrixLocationForXyzDiffuseTexture;
+static GLint worldMatrixLocationForXyzDiffuseTexture;
+
+void setUpShadersForXyzDiffuseTexture() {
+	const char *vertexShaderStringForXyzDiffuseTexture =
+		"uniform mat4 projectionMatrix;\n"
+		"uniform mat4 viewMatrix;\n"
+		"uniform mat4 worldMatrix;\n"
+		"attribute vec3 vPosition;\n"
+		"void main() {\n"
+		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
+		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
+		"   gl_Position = transformedPosition / transformedPosition.w;\n"
+		"}\n";
+	const char *fragmentShaderStringForXyzDiffuseTexture =  
+		"precision mediump float;\n"
+		"void main() {\n"
+		"  gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n"
+		"}\n";
+	GLuint fragmentShaderForXyzDiffuseTexture = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzDiffuseTexture );
+	GLuint vertexShaderForXyzDiffuseTexture = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzDiffuseTexture );
+
+	programObjectForXyzDiffuseTexture = glCreateProgram();
+	if ( programObjectForXyzDiffuseTexture == 0 ) {
+		puts("ERROR: programObjectForXyzDiffuseTexture is 0");
+		return;
+	}
+
+	glAttachShader ( programObjectForXyzDiffuseTexture, fragmentShaderForXyzDiffuseTexture );
+	glAttachShader ( programObjectForXyzDiffuseTexture, vertexShaderForXyzDiffuseTexture );
+
+	// Link the program
+	glLinkProgram ( programObjectForXyzDiffuseTexture );
+
+	// Bind vPosition to attribute 0   
+	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 0, "vPosition" );
+
+	// Get the uniform locations
+	projectionMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "projectionMatrix");
+	viewMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "viewMatrix");
+	worldMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "worldMatrix");
+	printf("projectionMatrixLocation: %d\n", projectionMatrixLocationForXyzDiffuseTexture);
+	printf("viewMatrixLocation: %d\n", viewMatrixLocationForXyzDiffuseTexture);
+	printf("worldMatrixLocation: %d\n", worldMatrixLocationForXyzDiffuseTexture);
+
+	// Check the link status
+	GLint linked;
+	glGetProgramiv ( programObjectForXyzDiffuseTexture, GL_LINK_STATUS, &linked );
+	if ( !linked ) 
+	{
+		puts("ERROR: Shader for XYZ_DIFFUSE_TEXTURE not linked");
+		return;
+	}
+}
+
+IDirect3DDevice9::IDirect3DDevice9() {
+	setUpShadersForXyzDiffuseTexture();
+}
+
 HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMATRIX *pMatrix) {
 	puts("IDirect3DDevice9::SetTransform");
 
@@ -120,60 +228,15 @@ HRESULT IDirect3DDevice9::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuff
 	return S_OK;
 }
 
-///
-// Create a shader object, load the shader source, and
-// compile the shader.
-//
-GLuint LoadShader ( GLenum type, const char *shaderSrc )
-{
-   GLuint shader;
-   GLint compiled;
-   
-   // Create the shader object
-   shader = glCreateShader ( type );
-
-   if ( shader == 0 )
-   	return 0;
-
-   // Load the shader source
-   glShaderSource ( shader, 1, &shaderSrc, NULL );
-   
-   // Compile the shader
-   glCompileShader ( shader );
-
-   // Check the compile status
-   glGetShaderiv ( shader, GL_COMPILE_STATUS, &compiled );
-
-   if ( !compiled ) 
-   {
-      GLint infoLen = 0;
-
-      glGetShaderiv ( shader, GL_INFO_LOG_LENGTH, &infoLen );
-      
-      if ( infoLen > 1 )
-      {
-         char* infoLog = (char *)malloc (sizeof(char) * infoLen );
-
-         glGetShaderInfoLog ( shader, infoLen, NULL, infoLog );
-         esLogMessage ( "Error compiling shader:\n%s\n", infoLog );            
-         
-         free ( infoLog );
-      }
-
-      glDeleteShader ( shader );
-      return 0;
-   }
-
-   return shader;
-}
-
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
 	puts("IDirect3DDevice9::DrawPrimitive");
 
 	switch (PrimitiveType) {
 		case D3DPT_LINELIST:
+		puts("Not implemented yet: D3DPT_LINELIST");
 		break;
 		case D3DPT_LINESTRIP:
+		puts("Not implemented yet: D3DPT_LINESTRIP");
 		break;
 		case D3DPT_TRIANGLELIST:
 		{
@@ -182,88 +245,45 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			PrintMatrix("Projection matrix", &this->projectionMatrix);
 
 			// This is used for drawing the track
-			const char *vShaderStr =
-				"uniform mat4 projectionMatrix;\n"
-				"uniform mat4 viewMatrix;\n"
-				"uniform mat4 worldMatrix;\n"
-				"attribute vec3 vPosition;\n"
-				"void main() {\n"
-				"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
-				"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
-				"   gl_Position = transformedPosition / transformedPosition.w;\n"
-				"}\n";
-			GLuint vertexShader = LoadShader ( GL_VERTEX_SHADER, vShaderStr );
 
-			const char *fShaderStr =  
-				"precision mediump float;\n"
-				"void main() {\n"
-				"  gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n"
-				"}\n";
-			GLuint fragmentShader = LoadShader ( GL_FRAGMENT_SHADER, fShaderStr );
-
-			GLuint programObject = glCreateProgram();
-			if ( programObject == 0 ) {
-				puts("programObject is 0");
-				return E_FAIL;
+			if (currentFvf == XYZ_DIFFUSE_TEXTURE) {
+				DrawTriangleListForXyzDiffuseTexture(StartVertex, PrimitiveCount);
+			} else {
+				printf("ERROR: Unsupported FVF: %ld\n", currentFvf);
 			}
-
-			glAttachShader ( programObject, vertexShader );
-			glAttachShader ( programObject, fragmentShader );
-
-			// Link the program
-			glLinkProgram ( programObject );
-
-			// Bind vPosition to attribute 0   
-			glBindAttribLocation ( programObject, 0, "vPosition" );
-
-			// Get the uniform locations
-			GLint projectionMatrixLocation = glGetUniformLocation(programObject, "projectionMatrix");
-			GLint viewMatrixLocation = glGetUniformLocation(programObject, "viewMatrix");
-			GLint worldMatrixLocation = glGetUniformLocation(programObject, "worldMatrix");
-			printf("projectionMatrixLocation: %d\n", projectionMatrixLocation);
-			printf("viewMatrixLocation: %d\n", viewMatrixLocation);
-			printf("worldMatrixLocation: %d\n", worldMatrixLocation);
-
-			// Check the link status
-			GLint linked;
-			glGetProgramiv ( programObject, GL_LINK_STATUS, &linked );
-			if ( !linked ) 
-			{
-				puts("Shader not linked");
-				return E_FAIL;
-			}
-
-			glUseProgram ( programObject );
-
-			D3DXMATRIX identity;
-			D3DXMatrixIdentity(&identity);
-			// Load the matrices
-			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
-			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
-
-			unsigned int VBO;
-			glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
-			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-			printf("length: %ld\n", currentStreamSource->length);
-			printf("currentStride: %d", currentStride);
-			glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
-
-			glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
-			glEnableVertexAttribArray(0);
-
-			printf("Drawing %d triangles\n", PrimitiveCount);
-			glDrawArrays ( GL_TRIANGLES, 0, PrimitiveCount * 3 );
 		}
 		break;
 		case D3DPT_TRIANGLESTRIP:
+		puts("Not implemented yet: D3DPT_TRIANGLESTRIP");
 		break;
 		case D3DPT_TRIANGLEFAN:
+		puts("Not implemented yet: D3DPT_TRIANGLEFAN");
 		break;
 	}
 
 	return S_OK;
+}
+
+void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UINT PrimitiveCount) {
+	glUseProgram(programObjectForXyzDiffuseTexture);
+
+	glUniformMatrix4fv(projectionMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
+	glUniformMatrix4fv(viewMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
+	glUniformMatrix4fv(worldMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	printf("length: %ld\n", currentStreamSource->length);
+	printf("currentStride: %d", currentStride);
+	glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
+	glEnableVertexAttribArray(0);
+
+	printf("Drawing %d triangles\n", PrimitiveCount);
+	glDrawArrays ( GL_TRIANGLES, 0, PrimitiveCount * 3 );
 }
 
 static IDirect3DDevice9 *globalDirect3DDevice;
