@@ -3,6 +3,9 @@
 #include "SDL/SDL_opengl.h"
 #include <GL/glut.h>
 
+#define XYZRHW_DIFFUSE (D3DFVF_XYZRHW | D3DFVF_DIFFUSE)
+#define XYZ_DIFFUSE_TEXTURE (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1)
+
 void PrintMatrix(const char *name, const D3DMATRIX *m) {
 	printf("%s:\n", name);
 	printf("%f %f %f %f\n", m->_11, m->_12, m->_13, m->_14);
@@ -16,7 +19,6 @@ HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMA
 	puts("IDirect3DDevice9::SetTransform");
 
 	if (State == D3DTS_VIEW) {
-		PrintMatrix("New view matrix", pMatrix);
 		memcpy(&this->viewMatrix, pMatrix, sizeof(D3DMATRIX));
 	} else if (State == D3DTS_PROJECTION) {
 		memcpy(&this->projectionMatrix, pMatrix, sizeof(D3DMATRIX));
@@ -93,7 +95,7 @@ HRESULT IDirect3DDevice9::SetFVF(DWORD FVF) {
 	// - `D3DFVF_XYZRHW | D3DFVF_DIFFUSE` for `TRANSFORMEDVERTEX` (FLOAT x, y, z, rhw; DWORD color;)
 	// - `D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1` for `UTVERTEX` (D3DXVECTOR3 pos; DWORD color;	FLOAT tu,tv;)
 
-	if (FVF != (D3DFVF_XYZRHW | D3DFVF_DIFFUSE) && FVF != (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1)) {
+	if (FVF != XYZRHW_DIFFUSE && FVF != XYZ_DIFFUSE_TEXTURE) {
 		printf("Unsupported FVF: %ld", FVF);
 	}
 
@@ -164,35 +166,6 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
 
    return shader;
 }
-
-void DrawDummyTriangle() {
-	   GLfloat vVertices[] = {  0.0f,  0.5f, 0.0f, 
-                           -0.5f, -0.5f, 0.0f,
-                            0.5f, -0.5f, 0.0f };
-
-   // No clientside arrays, so do this in a webgl-friendly manner
-   GLuint vertexPosObject;
-   glGenBuffers(1, &vertexPosObject);
-   glBindBuffer(GL_ARRAY_BUFFER, vertexPosObject);
-   glBufferData(GL_ARRAY_BUFFER, 9*4, vVertices, GL_STATIC_DRAW);
-   
-   // Set the viewport
-	const D3DSURFACE_DESC *surfaceDescription = DXUTGetBackBufferSurfaceDesc();
-	glViewport(0, 0, surfaceDescription->Width, surfaceDescription->Height);
-   
-   // Load the vertex data
-   glBindBuffer(GL_ARRAY_BUFFER, vertexPosObject);
-   glVertexAttribPointer(0 /* ? */, 3, GL_FLOAT, 0, 0, 0);
-   glEnableVertexAttribArray(0);
-
-   glDrawArrays ( GL_TRIANGLES, 0, 3 );
-}
-
-typedef struct POINT3D {
-	GLfloat x;
-	GLfloat y;
-	GLfloat z;
-};
 
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
 	puts("IDirect3DDevice9::DrawPrimitive");
@@ -268,8 +241,6 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
 			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
-
-			//DrawDummyTriangle();
 
 			unsigned int VBO;
 			glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
