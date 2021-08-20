@@ -77,6 +77,7 @@ void setUpShadersForXyzDiffuseTexture() {
 		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
 		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
 		"   gl_Position = transformedPosition / transformedPosition.w;\n"
+		"   gl_Position.y *= -1.0;\n" // Accomodate for DirectX top-left origin
 		"}\n";
 	const char *fragmentShaderStringForXyzDiffuseTexture =  
 		"precision mediump float;\n"
@@ -170,6 +171,8 @@ HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags,
 		glClear ( GL_DEPTH_BUFFER_BIT );
 		return S_OK;
 	} else if (Flags == D3DCLEAR_TARGET) {
+		UINT windowHeight = DXUTGetBackBufferSurfaceDesc()->Height;
+
 		glEnable(GL_SCISSOR_TEST);
 		GLclampf red = ((Color >> 16) & 0xFF) / 255.0f;
 		GLclampf green = ((Color >> 8) & 0xFF) / 255.0f;
@@ -177,7 +180,8 @@ HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags,
 		glClearColor(red, green, blue, 0xFF);
 		for (int i = 0; i < Count; i++) {
 			D3DRECT rect = pRects[i];
-			glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+			UINT y1 = windowHeight - rect.y2; // Accomodate for DirectX top-left origin
+			glScissor(rect.x1, y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
 			glClear(GL_COLOR_BUFFER_BIT);
 		}
 		glDisable(GL_SCISSOR_TEST);
@@ -274,8 +278,6 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 	unsigned int VBO;
 	glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	printf("length: %ld\n", currentStreamSource->length);
-	printf("currentStride: %d", currentStride);
 	glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
