@@ -22,8 +22,8 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
   FLOAT      zn,
   FLOAT      zf
 ) {
-	puts("D3DXMatrixPerspectiveFovLH");
-	printf("fovy: %f, Aspect: %f, zn: %f, zf: %f\n", fovy, Aspect, zn, zf);
+	Debug("D3DXMatrixPerspectiveFovLH");
+	DebugPrintf("fovy: %f, Aspect: %f, zn: %f, zf: %f\n", fovy, Aspect, zn, zf);
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixperspectivefovlh
 	double yScale = cotan(fovy/2);
@@ -59,7 +59,7 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
 D3DXMATRIX* D3DXMatrixIdentity(
   D3DXMATRIX *pOut
 ) {
-	puts("D3DXMatrixIdentity");
+	Debug("D3DXMatrixIdentity");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixidentity
 
@@ -94,7 +94,7 @@ D3DXMATRIX* D3DXMatrixRotationX(
   D3DXMATRIX *pOut,
   FLOAT      Angle
 ) {
-	puts("D3DXMatrixRotationX");
+	Debug("D3DXMatrixRotationX");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixrotationx
 
@@ -132,7 +132,7 @@ D3DXMATRIX* D3DXMatrixRotationY(
   D3DXMATRIX *pOut,
   FLOAT      Angle
 ) {
-	puts("D3DXMatrixRotationY");
+	Debug("D3DXMatrixRotationY");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixrotationy
 
@@ -170,7 +170,7 @@ D3DXMATRIX* D3DXMatrixRotationZ(
   D3DXMATRIX *pOut,
   FLOAT      Angle
 ) {
-	puts("D3DXMatrixRotationZ");
+	Debug("D3DXMatrixRotationZ");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixrotationz
 
@@ -210,7 +210,7 @@ D3DXMATRIX* D3DXMatrixTranslation(
   FLOAT      y,
   FLOAT      z
 ) {
-	puts("D3DXMatrixTranslation");
+	Debug("D3DXMatrixTranslation");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixtranslation
 
@@ -242,7 +242,7 @@ D3DXMATRIX* D3DXMatrixTranslation(
 }
 
 void PrintVector(const char *name, const D3DXVECTOR3 *v) {
-	printf("%s: {%f, %f, %f}\n", name, v->x, v->y, v->z);
+	DebugPrintf("%s: {%f, %f, %f}\n", name, v->x, v->y, v->z);
 }
 
 D3DXMATRIX* D3DXMatrixLookAtLH(
@@ -251,7 +251,7 @@ D3DXMATRIX* D3DXMatrixLookAtLH(
   const D3DXVECTOR3 *pAt,
   const D3DXVECTOR3 *pUp
 ) {
-	puts("D3DXMatrixLookAtLH");
+	Debug("D3DXMatrixLookAtLH");
 	PrintVector("pEye", pEye);
 	PrintVector("pAt", pAt);
 	PrintVector("pUp", pUp);
@@ -302,7 +302,7 @@ D3DXMATRIX* D3DXMatrixMultiply(
   const D3DXMATRIX *pM1,
   const D3DXMATRIX *pM2
 ) {
-	puts("D3DXMatrixMultiply");
+	Debug("D3DXMatrixMultiply");
 
 	// See https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxmatrixmultiply
 

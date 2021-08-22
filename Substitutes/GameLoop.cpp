@@ -8,46 +8,46 @@ static LPDXUTCALLBACKFRAMEMOVE frameMoveCallback;
 static LPDXUTCALLBACKFRAMERENDER frameRenderCallback;
 
 void DXUTSetCallbackDeviceCreated( LPDXUTCALLBACKDEVICECREATED pCallbackDeviceCreated, void* pUserContext ) {
-	puts("DXUTSetCallbackDeviceCreated");
+	Debug("DXUTSetCallbackDeviceCreated");
 }
 
 void DXUTSetCallbackDeviceReset( LPDXUTCALLBACKDEVICERESET pCallbackDeviceReset, void* pUserContext ) {
-	puts("DXUTSetCallbackDeviceReset");
+	Debug("DXUTSetCallbackDeviceReset");
 	deviceResetCallback = pCallbackDeviceReset;
 }
 
 void DXUTSetCallbackDeviceLost( LPDXUTCALLBACKDEVICELOST pCallbackDeviceLost, void* pUserContext ) {
-	puts("DXUTSetCallbackDeviceLost");
+	Debug("DXUTSetCallbackDeviceLost");
 }
 
 void DXUTSetCallbackDeviceDestroyed( LPDXUTCALLBACKDEVICEDESTROYED pCallbackDeviceDestroyed, void* pUserContext ) {
-	puts("DXUTSetCallbackDeviceDestroyed");
+	Debug("DXUTSetCallbackDeviceDestroyed");
 }
 
 void DXUTSetCallbackDeviceChanging( LPDXUTCALLBACKMODIFYDEVICESETTINGS pCallbackModifyDeviceSettings, void* pUserContext ) {
-	puts("DXUTSetCallbackDeviceChanging");
+	Debug("DXUTSetCallbackDeviceChanging");
 }
 
 void DXUTSetCallbackFrameMove( LPDXUTCALLBACKFRAMEMOVE pCallbackFrameMove, void* pUserContext ) {
-	puts("DXUTSetCallbackFrameMove");
+	Debug("DXUTSetCallbackFrameMove");
 	frameMoveCallback = pCallbackFrameMove;
 }
 
 void DXUTSetCallbackFrameRender( LPDXUTCALLBACKFRAMERENDER pCallbackFrameRender, void* pUserContext ) {
-	puts("DXUTSetCallbackFrameRender");
+	Debug("DXUTSetCallbackFrameRender");
 	frameRenderCallback = pCallbackFrameRender;
 }
 
 void DXUTSetCallbackKeyboard( LPDXUTCALLBACKKEYBOARD pCallbackKeyboard, void* pUserContext ) {
-	puts("DXUTSetCallbackKeyboard");
+	Debug("DXUTSetCallbackKeyboard");
 }
 
 void DXUTSetCallbackMouse( LPDXUTCALLBACKMOUSE pCallbackMouse, bool bIncludeMouseMove, void* pUserContext ) {
-	puts("DXUTSetCallbackMouse");
+	Debug("DXUTSetCallbackMouse");
 }
 
 void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUserContext ) {
-	puts("DXUTSetCallbackMsgProc");
+	Debug("DXUTSetCallbackMsgProc");
 }
 
 
@@ -56,7 +56,7 @@ void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUser
 // emscripten_request_animation_frame_loop().
 EM_BOOL one_iter(double time, void* userData) {
 	// Can render to the screen here, etc.
-	puts("One iteration");
+	Debug("One iteration");
 
 	if (frameMoveCallback) {
 		frameMoveCallback(DXUTGetD3DDevice(), time, time, null);
@@ -78,20 +78,20 @@ EM_BOOL one_iter(double time, void* userData) {
 INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int );
 
 int main() {
-	puts("Main function!");
+	Debug("Main function!");
 	if (WinMain( NULL, NULL, NULL, NULL ) == FALSE) {
-		puts("WinMain failed");
+		Error("WinMain failed");
 		return 0;
 	}
 
 	SetUpD3DDevice();
 
 	if (deviceResetCallback) {
-		puts("Resetting device");
+		Debug("Resetting device");
 
 		HRESULT resetDeviceResult = deviceResetCallback(DXUTGetD3DDevice(), DXUTGetBackBufferSurfaceDesc(), null);
 		if (resetDeviceResult != S_OK) {
-			printf("Device reset callback returned failure code %ld\n", resetDeviceResult);
+			ErrorPrintf("Device reset callback returned failure code %ld\n", resetDeviceResult);
 			return resetDeviceResult;
 		}
 	}

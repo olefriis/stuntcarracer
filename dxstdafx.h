@@ -2,6 +2,25 @@
 #include <stdlib.h>
 #include <iostream>
 
+#define DEBUG_ENABLED 1
+#define ERROR_ENABLED 1
+
+#if DEBUG_ENABLED
+#define Debug(x) printf("DEBUG: %s\n", x);
+#define DebugPrintf(fmt, ...) printf("DEBUG: "); printf(fmt, ##__VA_ARGS__)
+#else
+#define Debug(x)
+#define DebugPrintf(fmt, ...)
+#endif
+
+#if ERROR_ENABLED
+#define Error(x) printf("ERROR: %s\n", x);
+#define ErrorPrintf(fmt, ...) printf("ERROR: "); printf(fmt, ##__VA_ARGS__)
+#else
+#define Error(x)
+#define ErrorPrintf(fmt, ...)
+#endif
+
 // Various typedefs that apparently are Windows-specific, but are used all over the code
 // See e.g.:
 // * https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/efda8314-6e41-4837-8299-38ba0ee04b92

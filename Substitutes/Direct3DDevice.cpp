@@ -7,12 +7,12 @@
 #define XYZ_DIFFUSE_TEXTURE (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1)
 
 void PrintMatrix(const char *name, const D3DMATRIX *m) {
-	printf("%s:\n", name);
-	printf("%f %f %f %f\n", m->_11, m->_12, m->_13, m->_14);
-	printf("%f %f %f %f\n", m->_21, m->_22, m->_23, m->_24);
-	printf("%f %f %f %f\n", m->_31, m->_32, m->_33, m->_34);
-	printf("%f %f %f %f\n", m->_41, m->_42, m->_43, m->_44);
-	printf("\n");
+	DebugPrintf("%s:\n", name);
+	DebugPrintf("%f %f %f %f\n", m->_11, m->_12, m->_13, m->_14);
+	DebugPrintf("%f %f %f %f\n", m->_21, m->_22, m->_23, m->_24);
+	DebugPrintf("%f %f %f %f\n", m->_31, m->_32, m->_33, m->_34);
+	DebugPrintf("%f %f %f %f\n", m->_41, m->_42, m->_43, m->_44);
+	DebugPrintf("\n");
 }
 
 ///
@@ -93,7 +93,7 @@ void setUpShadersForXyzDiffuseTexture() {
 
 	programObjectForXyzDiffuseTexture = glCreateProgram();
 	if ( programObjectForXyzDiffuseTexture == 0 ) {
-		puts("ERROR: programObjectForXyzDiffuseTexture is 0");
+		Debug("ERROR: programObjectForXyzDiffuseTexture is 0");
 		return;
 	}
 
@@ -110,16 +110,16 @@ void setUpShadersForXyzDiffuseTexture() {
 	projectionMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "projectionMatrix");
 	viewMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "viewMatrix");
 	worldMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "worldMatrix");
-	printf("projectionMatrixLocation: %d\n", projectionMatrixLocationForXyzDiffuseTexture);
-	printf("viewMatrixLocation: %d\n", viewMatrixLocationForXyzDiffuseTexture);
-	printf("worldMatrixLocation: %d\n", worldMatrixLocationForXyzDiffuseTexture);
+	DebugPrintf("projectionMatrixLocation: %d\n", projectionMatrixLocationForXyzDiffuseTexture);
+	DebugPrintf("viewMatrixLocation: %d\n", viewMatrixLocationForXyzDiffuseTexture);
+	DebugPrintf("worldMatrixLocation: %d\n", worldMatrixLocationForXyzDiffuseTexture);
 
 	// Check the link status
 	GLint linked;
 	glGetProgramiv ( programObjectForXyzDiffuseTexture, GL_LINK_STATUS, &linked );
 	if ( !linked ) 
 	{
-		puts("ERROR: Shader for XYZ_DIFFUSE_TEXTURE not linked");
+		Debug("ERROR: Shader for XYZ_DIFFUSE_TEXTURE not linked");
 		return;
 	}
 }
@@ -145,7 +145,7 @@ void setUpShadersForXyzrhwDiffuse() {
 
 	programObjectForXyzrhwDiffuse = glCreateProgram();
 	if ( programObjectForXyzrhwDiffuse == 0 ) {
-		puts("ERROR: programObjectForXyzrhwDiffuse is 0");
+		Debug("ERROR: programObjectForXyzrhwDiffuse is 0");
 		return;
 	}
 
@@ -162,15 +162,15 @@ void setUpShadersForXyzrhwDiffuse() {
 	// Get the uniform locations
 	windowWidthLocationForXyzrhwDiffuse = glGetUniformLocation(programObjectForXyzrhwDiffuse, "windowWidth");
 	windowHeightLocationForXyzrhwDiffuse = glGetUniformLocation(programObjectForXyzrhwDiffuse, "windowHeight");
-	printf("windowWidthLocationForXyzrhwDiffuse: %d\n", windowWidthLocationForXyzrhwDiffuse);
-	printf("windowHeightLocationForXyzrhwDiffuse: %d\n", windowHeightLocationForXyzrhwDiffuse);
+	DebugPrintf("windowWidthLocationForXyzrhwDiffuse: %d\n", windowWidthLocationForXyzrhwDiffuse);
+	DebugPrintf("windowHeightLocationForXyzrhwDiffuse: %d\n", windowHeightLocationForXyzrhwDiffuse);
 
 	// Check the link status
 	GLint linked;
 	glGetProgramiv ( programObjectForXyzrhwDiffuse, GL_LINK_STATUS, &linked );
 	if ( !linked ) 
 	{
-		puts("ERROR: Shader for XYZRHW_DIFFUSE not linked");
+		Debug("ERROR: Shader for XYZRHW_DIFFUSE not linked");
 		return;
 	}
 }
@@ -185,7 +185,7 @@ IDirect3DDevice9::IDirect3DDevice9() {
 }
 
 HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMATRIX *pMatrix) {
-	printf("IDirect3DDevice9::SetTransform(%d, matrix)\n", State);
+	DebugPrintf("IDirect3DDevice9::SetTransform(%d, matrix)\n", State);
 
 	if (State == D3DTS_VIEW) {
 		memcpy(&this->viewMatrix, pMatrix, sizeof(D3DMATRIX));
@@ -194,14 +194,14 @@ HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMA
 	} else if (State == D3DTS_WORLD) {
 		memcpy(&this->worldMatrix, pMatrix, sizeof(D3DMATRIX));
 	} else {
-		printf("Unknown transform state type: %d", State);
+		ErrorPrintf("Unknown transform state type: %d", State);
 	}
 
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) {
-	puts("IDirect3DDevice9::SetRenderState");
+	Debug("IDirect3DDevice9::SetRenderState");
 
 	if (State == D3DRS_CULLMODE) {
 		if (Value == D3DCULL_NONE) {
@@ -213,7 +213,7 @@ HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) 
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_FRONT);
 		} else {
-			printf("Unknown cull mode: %d", Value);
+			ErrorPrintf("Unknown cull mode: %lu", Value);
 		}
 	} else if (State == D3DRS_ZENABLE) {
 		if (Value == TRUE) {
@@ -222,34 +222,34 @@ HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) 
 			glDisable(GL_DEPTH_TEST);
 		}
 	} else {
-		printf("Unknown render state type: %d", State);
+		ErrorPrintf("Unknown render state type: %d\n", State);
 	}
 
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::SetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATETYPE Type, DWORD Value) {
-	puts("IDirect3DDevice9::SetTextureStageState");
+	Debug("IDirect3DDevice9::SetTextureStageState");
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::SetTexture(DWORD Stage, IDirect3DBaseTexture9 *pTexture) {
-	puts("IDirect3DDevice9::SetTexture");
+	Debug("IDirect3DDevice9::SetTexture");
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::BeginScene() {
-	puts("IDirect3DDevice9::BeginScene");
+	Debug("IDirect3DDevice9::BeginScene");
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::EndScene() {
-	puts("IDirect3DDevice9::EndScene");
+	Debug("IDirect3DDevice9::EndScene");
 	return S_OK;
 }
 
 HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags, D3DCOLOR Color, float Z, DWORD Stencil) {
-	printf("IDirect3DDevice9::Clear(count=%ld, Color=%ld)\n", Count, Color);
+	DebugPrintf("IDirect3DDevice9::Clear(count=%ld, Color=%ld)\n", Count, Color);
 	if (Flags == D3DCLEAR_ZBUFFER) {
 		glClear ( GL_DEPTH_BUFFER_BIT );
 		return S_OK;
@@ -271,12 +271,12 @@ HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags,
 		return S_OK;
 	}
 
-	printf("Unknown flag: %ld", Flags);
+	ErrorPrintf("Unknown flag: %ld", Flags);
 	return E_FAIL;
 }
 
 HRESULT IDirect3DDevice9::CreateVertexBuffer(UINT Length, DWORD Usage, DWORD FVF, D3DPOOL Pool, IDirect3DVertexBuffer9 **ppVertexBuffer, HANDLE *pSharedHandle) {
-	puts("IDirect3DDevice9::CreateVertexBuffer");
+	Debug("IDirect3DDevice9::CreateVertexBuffer");
 
 	*ppVertexBuffer = new IDirect3DVertexBuffer9(Length);
 
@@ -284,14 +284,14 @@ HRESULT IDirect3DDevice9::CreateVertexBuffer(UINT Length, DWORD Usage, DWORD FVF
 }
 
 HRESULT IDirect3DDevice9::SetFVF(DWORD FVF) {
-	puts("IDirect3DDevice9::SetFVF");
+	Debug("IDirect3DDevice9::SetFVF");
 
 	// We're being called with these FVFs:
 	// - `D3DFVF_XYZRHW | D3DFVF_DIFFUSE` for `TRANSFORMEDVERTEX` (FLOAT x, y, z, rhw; DWORD color;)
 	// - `D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1` for `UTVERTEX` (D3DXVECTOR3 pos; DWORD color;	FLOAT tu,tv;)
 
 	if (FVF != XYZRHW_DIFFUSE && FVF != XYZ_DIFFUSE_TEXTURE) {
-		printf("Unsupported FVF: %ld", FVF);
+		ErrorPrintf("Unsupported FVF: %ld", FVF);
 	}
 
 	currentFvf = FVF;
@@ -300,13 +300,13 @@ HRESULT IDirect3DDevice9::SetFVF(DWORD FVF) {
 }
 
 HRESULT IDirect3DDevice9::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuffer9 *pStreamData, UINT OffsetInBytes, UINT Stride) {
-	puts("IDirect3DDevice9::SetStreamSource");
+	Debug("IDirect3DDevice9::SetStreamSource");
 
 	if (StreamNumber != 0) {
-		printf("Stream number %d is not supported\n", StreamNumber);
+		ErrorPrintf("Stream number %d is not supported\n", StreamNumber);
 	}
 	if (OffsetInBytes != 0) {
-		printf("OffsetInBytes %d is not supported\n", OffsetInBytes);
+		ErrorPrintf("OffsetInBytes %d is not supported\n", OffsetInBytes);
 	}
 
 	currentStreamSource = pStreamData;
@@ -316,14 +316,14 @@ HRESULT IDirect3DDevice9::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuff
 }
 
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
-	printf("IDirect3DDevice9::DrawPrimitive(%d, %d, %d)\n", PrimitiveType, StartVertex, PrimitiveCount);
+	DebugPrintf("IDirect3DDevice9::DrawPrimitive(%d, %d, %d)\n", PrimitiveType, StartVertex, PrimitiveCount);
 
 	switch (PrimitiveType) {
 		case D3DPT_LINELIST:
-		puts("Not implemented yet: D3DPT_LINELIST");
+		Error("Not implemented yet: D3DPT_LINELIST");
 		break;
 		case D3DPT_LINESTRIP:
-		puts("Not implemented yet: D3DPT_LINESTRIP");
+		Error("Not implemented yet: D3DPT_LINESTRIP");
 		break;
 		case D3DPT_TRIANGLELIST:
 		{
@@ -336,12 +336,12 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			if (currentFvf == XYZ_DIFFUSE_TEXTURE) {
 				DrawTriangleListForXyzDiffuseTexture(StartVertex, PrimitiveCount);
 			} else {
-				printf("ERROR: Unsupported FVF for D3DPT_TRIANGLELIST: %ld\n", currentFvf);
+				ErrorPrintf("ERROR: Unsupported FVF for D3DPT_TRIANGLELIST: %ld\n", currentFvf);
 			}
 		}
 		break;
 		case D3DPT_TRIANGLESTRIP:
-		puts("Not implemented yet: D3DPT_TRIANGLESTRIP");
+		Error("Not implemented yet: D3DPT_TRIANGLESTRIP");
 		break;
 		case D3DPT_TRIANGLEFAN:
 		{
@@ -352,7 +352,7 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 			if (currentFvf == XYZRHW_DIFFUSE) {
 				DrawTriangleListForXyzrhwDiffuse(StartVertex, PrimitiveCount);
 			} else {
-				printf("ERROR: Unsupported FVF for D3DPT_TRIANGLEFAN: %ld\n", currentFvf);
+				ErrorPrintf("ERROR: Unsupported FVF for D3DPT_TRIANGLEFAN: %ld\n", currentFvf);
 			}
 		}
 		break;
@@ -377,7 +377,7 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
 	glEnableVertexAttribArray(0);
 
-	printf("Drawing %d triangles\n", PrimitiveCount);
+	DebugPrintf("Drawing %d triangles\n", PrimitiveCount);
 	glDrawArrays ( GL_TRIANGLES, 0, PrimitiveCount * 3 );
 }
 
@@ -401,7 +401,7 @@ void IDirect3DDevice9::DrawTriangleListForXyzrhwDiffuse(UINT StartVertex, UINT P
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_INT, GL_FALSE, currentStride, 0);
 	glEnableVertexAttribArray(0);
 
-	printf("Drawing %d triangle fans\n", PrimitiveCount);
+	DebugPrintf("Drawing %d triangle fans\n", PrimitiveCount);
 	glDrawArrays ( GL_TRIANGLE_FAN, 0, 2 + PrimitiveCount );
 }
 
@@ -412,6 +412,6 @@ void SetUpD3DDevice() {
 }
 
 IDirect3DDevice9* DXUTGetD3DDevice() {
-  puts("DXUTGetD3DDevice");
+  Debug("DXUTGetD3DDevice");
   return globalDirect3DDevice;
 }

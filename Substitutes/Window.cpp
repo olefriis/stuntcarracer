@@ -6,7 +6,7 @@ static ESContext esContext;
 static D3DSURFACE_DESC surfaceDescription;
 
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
-	puts("DXUTCreateWindow");
+	Debug("DXUTCreateWindow");
 
 	esCreateWindow(&esContext, "Stunt Car Racer", 320, 240, ES_WINDOW_RGB);
 
@@ -17,6 +17,6 @@ HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
 }
 
 CONST D3DSURFACE_DESC * DXUTGetBackBufferSurfaceDesc() {
-	puts("DXUTGetBackBufferSurfaceDesc");
+	Debug("DXUTGetBackBufferSurfaceDesc");
 	return &surfaceDescription;
 }

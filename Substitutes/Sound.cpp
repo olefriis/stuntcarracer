@@ -2,7 +2,7 @@
 #include "../dxstdafx.h"
 
 HRESULT DirectSoundCreate8( LPCGUID lpcGuidDevice, LPDIRECTSOUND8 * ppDS8, LPUNKNOWN pUnkOuter ) {
-  puts("DirectSoundCreate8");
+  Debug("DirectSoundCreate8");
 
   *ppDS8 = new IDirectSound8();
 
@@ -10,12 +10,12 @@ HRESULT DirectSoundCreate8( LPCGUID lpcGuidDevice, LPDIRECTSOUND8 * ppDS8, LPUNK
 }
 
 HRESULT IDirectSound8::SetCooperativeLevel( HWND hwnd, DWORD dwLevel ) {
-  puts("IDirectSound8::SetCooperativeLevel");
+  Debug("IDirectSound8::SetCooperativeLevel");
   return S_OK;
 }
 
 void IDirectSound8::Release() {
-  puts("IDirectSound8::Release");
+  Debug("IDirectSound8::Release");
 
   // Are we supposed to "destroy" the object here?
 }
@@ -49,7 +49,7 @@ HRESULT IDirectSoundBuffer8::GetCurrentPosition( LPDWORD pdwCurrentPlayCursor, L
 }
 
 void IDirectSoundBuffer8::Release() {
-  puts("IDirectSoundBuffer8::Release");
+  Debug("IDirectSoundBuffer8::Release");
 
   // Are we supposed to "destroy" the object here?
 }

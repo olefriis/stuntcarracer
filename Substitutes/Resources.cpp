@@ -38,13 +38,13 @@ HRSRC FindResource( HMODULE hModule, LPCWSTR lpName, LPCWSTR lpType ) {
     fileName = (char*) malloc(pathLength);
     sprintf(fileName, "Tracks/%ls.bin", lpName);
   } else {
-    printf("Unknown resource type: %ls (resource name: %ls)\n", lpType, lpName);
+    ErrorPrintf("Unknown resource type: %ls (resource name: %ls)\n", lpType, lpName);
     return null;
   }
 
   std::ifstream file(fileName, std::ios::binary | std::ios::ate);
   if (file.tellg() < 0) {
-    printf("File '%s' does not exist", fileName);
+    ErrorPrintf("File '%s' does not exist", fileName);
     free(fileName);
     return null;
   }
@@ -58,7 +58,7 @@ HGLOBAL LoadResource( HMODULE hModule, HRSRC hResInfo ) {
   std::streamsize size = file.tellg();
   if (size < 0) {
     free(fileName);
-    printf("File %s does not exist\n", fileName);
+    ErrorPrintf("File %s does not exist\n", fileName);
     return null;
   }
   file.seekg(0, std::ios::beg);
@@ -66,11 +66,11 @@ HGLOBAL LoadResource( HMODULE hModule, HRSRC hResInfo ) {
   char *buffer = (char*)malloc(size);
 
   if (file.read(buffer, size)) {
-    printf("Loaded the resource %s (%ld bytes)\n", fileName, size);
+    DebugPrintf("Loaded the resource %s (%ld bytes)\n", fileName, size);
     return buffer;
   }
 
-  printf("Could not load %s\n", fileName);
+  ErrorPrintf("Could not load %s\n", fileName);
   return null;
 }
 
