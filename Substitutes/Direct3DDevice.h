@@ -239,6 +239,7 @@ class IDirect3DDevice9 {
 
   private:
   void DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UINT PrimitiveCount);
+  void DrawTriangleListForXyzrhwDiffuse(UINT StartVertex, UINT PrimitiveCount);
   D3DXMATRIX viewMatrix;
   D3DXMATRIX worldMatrix;
   D3DXMATRIX projectionMatrix;

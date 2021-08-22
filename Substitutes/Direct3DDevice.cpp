@@ -62,10 +62,14 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
    return shader;
 }
 
-static GLuint programObjectForXyzDiffuseTexture = 0;
+static GLuint programObjectForXyzDiffuseTexture;
 static GLint projectionMatrixLocationForXyzDiffuseTexture;
 static GLint viewMatrixLocationForXyzDiffuseTexture;
 static GLint worldMatrixLocationForXyzDiffuseTexture;
+
+static GLuint programObjectForXyzrhwDiffuse;
+static GLint windowWidthLocationForXyzrhwDiffuse;
+static GLint windowHeightLocationForXyzrhwDiffuse;
 
 void setUpShadersForXyzDiffuseTexture() {
 	const char *vertexShaderStringForXyzDiffuseTexture =
@@ -84,8 +88,8 @@ void setUpShadersForXyzDiffuseTexture() {
 		"void main() {\n"
 		"  gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n"
 		"}\n";
-	GLuint fragmentShaderForXyzDiffuseTexture = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzDiffuseTexture );
 	GLuint vertexShaderForXyzDiffuseTexture = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzDiffuseTexture );
+	GLuint fragmentShaderForXyzDiffuseTexture = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzDiffuseTexture );
 
 	programObjectForXyzDiffuseTexture = glCreateProgram();
 	if ( programObjectForXyzDiffuseTexture == 0 ) {
@@ -120,12 +124,68 @@ void setUpShadersForXyzDiffuseTexture() {
 	}
 }
 
+void setUpShadersForXyzrhwDiffuse() {
+	const char *vertexShaderStringForXyzrhwDiffuse =
+		"attribute vec4 vPosition;\n"
+		"uniform float windowWidth;\n"
+		"uniform float windowHeight;\n"
+		"varying lowp vec4 outputColor;\n"
+		"void main() {\n"
+		"   gl_Position = vec4 (2.0 * vPosition.x / windowWidth - 1.0, -(2.0 * vPosition.y / windowHeight - 1.0), 0.5, 1.0);\n"
+		"   outputColor = vec4(0.5, 1.0, 1.0, 1.0);\n"
+		"}\n";
+	const char *fragmentShaderStringForXyzrhwDiffuse =  
+		"precision mediump float;\n"
+		"varying lowp vec4 outputColor;\n"
+		"void main() {\n"
+		"  gl_FragColor = outputColor;\n"
+		"}\n";
+	GLuint vertexShaderForXyzrhwDiffuse = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzrhwDiffuse );
+	GLuint fragmentShaderForXyzrhwDiffuse = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzrhwDiffuse );
+
+	programObjectForXyzrhwDiffuse = glCreateProgram();
+	if ( programObjectForXyzrhwDiffuse == 0 ) {
+		puts("ERROR: programObjectForXyzrhwDiffuse is 0");
+		return;
+	}
+
+	glAttachShader ( programObjectForXyzrhwDiffuse, fragmentShaderForXyzrhwDiffuse );
+	glAttachShader ( programObjectForXyzrhwDiffuse, vertexShaderForXyzrhwDiffuse );
+
+	// Link the program
+	glLinkProgram ( programObjectForXyzrhwDiffuse );
+
+	// Bind vPosition to attribute 0 and vColor to attribute 1   
+	glBindAttribLocation ( programObjectForXyzrhwDiffuse, 0, "vPosition" );
+	//glBindAttribLocation ( programObjectForXyzrhwDiffuse, 1, "vColor" );
+
+	// Get the uniform locations
+	windowWidthLocationForXyzrhwDiffuse = glGetUniformLocation(programObjectForXyzrhwDiffuse, "windowWidth");
+	windowHeightLocationForXyzrhwDiffuse = glGetUniformLocation(programObjectForXyzrhwDiffuse, "windowHeight");
+	printf("windowWidthLocationForXyzrhwDiffuse: %d\n", windowWidthLocationForXyzrhwDiffuse);
+	printf("windowHeightLocationForXyzrhwDiffuse: %d\n", windowHeightLocationForXyzrhwDiffuse);
+
+	// Check the link status
+	GLint linked;
+	glGetProgramiv ( programObjectForXyzrhwDiffuse, GL_LINK_STATUS, &linked );
+	if ( !linked ) 
+	{
+		puts("ERROR: Shader for XYZRHW_DIFFUSE not linked");
+		return;
+	}
+}
+
 IDirect3DDevice9::IDirect3DDevice9() {
+	D3DXMatrixIdentity(&viewMatrix);
+	D3DXMatrixIdentity(&worldMatrix);
+	D3DXMatrixIdentity(&projectionMatrix);
+
 	setUpShadersForXyzDiffuseTexture();
+	setUpShadersForXyzrhwDiffuse();
 }
 
 HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMATRIX *pMatrix) {
-	puts("IDirect3DDevice9::SetTransform");
+	printf("IDirect3DDevice9::SetTransform(%d, matrix)\n", State);
 
 	if (State == D3DTS_VIEW) {
 		memcpy(&this->viewMatrix, pMatrix, sizeof(D3DMATRIX));
@@ -142,6 +202,29 @@ HRESULT IDirect3DDevice9::SetTransform( D3DTRANSFORMSTATETYPE State, const D3DMA
 
 HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) {
 	puts("IDirect3DDevice9::SetRenderState");
+
+	if (State == D3DRS_CULLMODE) {
+		if (Value == D3DCULL_NONE) {
+			glDisable(GL_CULL_FACE);
+		} else if (Value == D3DCULL_CW) {
+			glEnable(GL_CULL_FACE);
+			glCullFace(GL_BACK);
+		} else if (Value == D3DCULL_CCW) {
+			glEnable(GL_CULL_FACE);
+			glCullFace(GL_FRONT);
+		} else {
+			printf("Unknown cull mode: %d", Value);
+		}
+	} else if (State == D3DRS_ZENABLE) {
+		if (Value == TRUE) {
+			glEnable(GL_DEPTH_TEST);
+		} else {
+			glDisable(GL_DEPTH_TEST);
+		}
+	} else {
+		printf("Unknown render state type: %d", State);
+	}
+
 	return S_OK;
 }
 
@@ -233,7 +316,7 @@ HRESULT IDirect3DDevice9::SetStreamSource(UINT StreamNumber, IDirect3DVertexBuff
 }
 
 HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount) {
-	puts("IDirect3DDevice9::DrawPrimitive");
+	printf("IDirect3DDevice9::DrawPrimitive(%d, %d, %d)\n", PrimitiveType, StartVertex, PrimitiveCount);
 
 	switch (PrimitiveType) {
 		case D3DPT_LINELIST:
@@ -244,16 +327,16 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 		break;
 		case D3DPT_TRIANGLELIST:
 		{
-			PrintMatrix("View matrix", &this->viewMatrix);
-			PrintMatrix("World matrix", &this->worldMatrix);
-			PrintMatrix("Projection matrix", &this->projectionMatrix);
+			//PrintMatrix("World matrix for TRIANGLELIST", &this->worldMatrix);
+			//PrintMatrix("View matrix for TRIANGLELIST", &this->viewMatrix);
+			//PrintMatrix("Projection matrix for TRIANGLELIST", &this->projectionMatrix);
 
 			// This is used for drawing the track
 
 			if (currentFvf == XYZ_DIFFUSE_TEXTURE) {
 				DrawTriangleListForXyzDiffuseTexture(StartVertex, PrimitiveCount);
 			} else {
-				printf("ERROR: Unsupported FVF: %ld\n", currentFvf);
+				printf("ERROR: Unsupported FVF for D3DPT_TRIANGLELIST: %ld\n", currentFvf);
 			}
 		}
 		break;
@@ -261,7 +344,17 @@ HRESULT IDirect3DDevice9::DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT Sta
 		puts("Not implemented yet: D3DPT_TRIANGLESTRIP");
 		break;
 		case D3DPT_TRIANGLEFAN:
-		puts("Not implemented yet: D3DPT_TRIANGLEFAN");
+		{
+			//PrintMatrix("World matrix for TRIANGLEFAN", &this->worldMatrix);
+			//PrintMatrix("View matrix for TRIANGLEFAN", &this->viewMatrix);
+			//PrintMatrix("Projection matrix for TRIANGLEFAN", &this->projectionMatrix);
+
+			if (currentFvf == XYZRHW_DIFFUSE) {
+				DrawTriangleListForXyzrhwDiffuse(StartVertex, PrimitiveCount);
+			} else {
+				printf("ERROR: Unsupported FVF for D3DPT_TRIANGLEFAN: %ld\n", currentFvf);
+			}
+		}
 		break;
 	}
 
@@ -286,6 +379,30 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 
 	printf("Drawing %d triangles\n", PrimitiveCount);
 	glDrawArrays ( GL_TRIANGLES, 0, PrimitiveCount * 3 );
+}
+
+// I've no idea at all why we should not take the transform matrices into account in this
+// shader. Some DirectX call must be turning off the world-view-projection transform...?
+void IDirect3DDevice9::DrawTriangleListForXyzrhwDiffuse(UINT StartVertex, UINT PrimitiveCount) {
+	glUseProgram(programObjectForXyzrhwDiffuse);
+
+	const D3DSURFACE_DESC *surfaceDescription = DXUTGetBackBufferSurfaceDesc();
+
+	glUniform1f(windowWidthLocationForXyzrhwDiffuse, (float) surfaceDescription->Width);
+	glUniform1f(windowHeightLocationForXyzrhwDiffuse, (float) surfaceDescription->Height);
+
+	unsigned int VBO;
+	glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, currentStride, 0);
+	glVertexAttribPointer(1, 3, GL_UNSIGNED_INT, GL_FALSE, currentStride, 0);
+	glEnableVertexAttribArray(0);
+
+	printf("Drawing %d triangle fans\n", PrimitiveCount);
+	glDrawArrays ( GL_TRIANGLE_FAN, 0, 2 + PrimitiveCount );
 }
 
 static IDirect3DDevice9 *globalDirect3DDevice;
