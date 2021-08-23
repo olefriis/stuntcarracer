@@ -8,4 +8,6 @@ class IDirect3DVertexBuffer9 {
   // Should probably be behind accessor, or be friend properties...
   UINT length;
   void *data;
+  unsigned int vbo;
+  UINT lockedSize;
 };

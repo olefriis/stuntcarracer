@@ -368,12 +368,7 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 	glUniformMatrix4fv(viewMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
 	glUniformMatrix4fv(worldMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
 
-	unsigned int VBO;
-	glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
+	glBindBuffer(GL_ARRAY_BUFFER, currentStreamSource->vbo);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
 	glEnableVertexAttribArray(0);
 
@@ -391,12 +386,7 @@ void IDirect3DDevice9::DrawTriangleListForXyzrhwDiffuse(UINT StartVertex, UINT P
 	glUniform1f(windowWidthLocationForXyzrhwDiffuse, (float) surfaceDescription->Width);
 	glUniform1f(windowHeightLocationForXyzrhwDiffuse, (float) surfaceDescription->Height);
 
-	unsigned int VBO;
-	glGenBuffers(1, &VBO); // Generate a single OpenGL buffer object
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, currentStreamSource->length, currentStreamSource->data, GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Seems superfluous? 
+	glBindBuffer(GL_ARRAY_BUFFER, currentStreamSource->vbo);
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, currentStride, 0);
 	glVertexAttribPointer(1, 3, GL_UNSIGNED_INT, GL_FALSE, currentStride, 0);
 	glEnableVertexAttribArray(0);
