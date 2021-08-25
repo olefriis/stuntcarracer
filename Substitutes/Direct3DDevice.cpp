@@ -73,20 +73,24 @@ static GLint windowHeightLocationForXyzrhwDiffuse;
 
 void setUpShadersForXyzDiffuseTexture() {
 	const char *vertexShaderStringForXyzDiffuseTexture =
+		"attribute vec3 vPosition;\n"
+		"attribute vec4 vColor;\n"
 		"uniform mat4 projectionMatrix;\n"
 		"uniform mat4 viewMatrix;\n"
 		"uniform mat4 worldMatrix;\n"
-		"attribute vec3 vPosition;\n"
+		"varying lowp vec4 outputColor;\n"
 		"void main() {\n"
 		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
 		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
 		"   gl_Position = transformedPosition / transformedPosition.w;\n"
 		"   gl_Position.y *= -1.0;\n" // Accomodate for DirectX top-left origin
+		"   outputColor = vColor;\n"
 		"}\n";
 	const char *fragmentShaderStringForXyzDiffuseTexture =  
 		"precision mediump float;\n"
+		"varying lowp vec4 outputColor;\n"
 		"void main() {\n"
-		"  gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n"
+		"   gl_FragColor = outputColor;\n"
 		"}\n";
 	GLuint vertexShaderForXyzDiffuseTexture = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzDiffuseTexture );
 	GLuint fragmentShaderForXyzDiffuseTexture = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzDiffuseTexture );
@@ -103,8 +107,9 @@ void setUpShadersForXyzDiffuseTexture() {
 	// Link the program
 	glLinkProgram ( programObjectForXyzDiffuseTexture );
 
-	// Bind vPosition to attribute 0   
+	// Bind vPosition to attribute 0 and vColor to attribute 1
 	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 0, "vPosition" );
+	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 1, "vColor" );
 
 	// Get the uniform locations
 	projectionMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "projectionMatrix");
@@ -127,18 +132,19 @@ void setUpShadersForXyzDiffuseTexture() {
 void setUpShadersForXyzrhwDiffuse() {
 	const char *vertexShaderStringForXyzrhwDiffuse =
 		"attribute vec4 vPosition;\n"
+		"attribute vec4 vColor;\n"
 		"uniform float windowWidth;\n"
 		"uniform float windowHeight;\n"
 		"varying lowp vec4 outputColor;\n"
 		"void main() {\n"
 		"   gl_Position = vec4 (2.0 * vPosition.x / windowWidth - 1.0, -(2.0 * vPosition.y / windowHeight - 1.0), 0.5, 1.0);\n"
-		"   outputColor = vec4(0.5, 1.0, 1.0, 1.0);\n"
+		"   outputColor = vColor;\n"
 		"}\n";
 	const char *fragmentShaderStringForXyzrhwDiffuse =  
 		"precision mediump float;\n"
 		"varying lowp vec4 outputColor;\n"
 		"void main() {\n"
-		"  gl_FragColor = outputColor;\n"
+		"   gl_FragColor = outputColor;\n"
 		"}\n";
 	GLuint vertexShaderForXyzrhwDiffuse = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzrhwDiffuse );
 	GLuint fragmentShaderForXyzrhwDiffuse = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzrhwDiffuse );
@@ -155,9 +161,9 @@ void setUpShadersForXyzrhwDiffuse() {
 	// Link the program
 	glLinkProgram ( programObjectForXyzrhwDiffuse );
 
-	// Bind vPosition to attribute 0 and vColor to attribute 1   
+	// Bind vPosition to attribute 0 and vColor to attribute 1
 	glBindAttribLocation ( programObjectForXyzrhwDiffuse, 0, "vPosition" );
-	//glBindAttribLocation ( programObjectForXyzrhwDiffuse, 1, "vColor" );
+	glBindAttribLocation ( programObjectForXyzrhwDiffuse, 1, "vColor" );
 
 	// Get the uniform locations
 	windowWidthLocationForXyzrhwDiffuse = glGetUniformLocation(programObjectForXyzrhwDiffuse, "windowWidth");
@@ -368,12 +374,14 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 	glUniformMatrix4fv(viewMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
 	glUniformMatrix4fv(worldMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
 
-	glBindBuffer(GL_ARRAY_BUFFER, currentStreamSource->vbo);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, currentStride, 0);
+	currentStreamSource->PrepareForForXyzDiffuseTexture(currentStride);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(XyzDiffuseTextureConverted), 0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(XyzDiffuseTextureConverted), (void *)(3 * sizeof(FLOAT)));
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	DebugPrintf("Drawing %d triangles\n", PrimitiveCount);
-	glDrawArrays ( GL_TRIANGLES, 0, PrimitiveCount * 3 );
+	glDrawArrays ( GL_TRIANGLES, StartVertex, PrimitiveCount * 3 );
 }
 
 // I've no idea at all why we should not take the transform matrices into account in this
@@ -386,13 +394,14 @@ void IDirect3DDevice9::DrawTriangleListForXyzrhwDiffuse(UINT StartVertex, UINT P
 	glUniform1f(windowWidthLocationForXyzrhwDiffuse, (float) surfaceDescription->Width);
 	glUniform1f(windowHeightLocationForXyzrhwDiffuse, (float) surfaceDescription->Height);
 
-	glBindBuffer(GL_ARRAY_BUFFER, currentStreamSource->vbo);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, currentStride, 0);
-	glVertexAttribPointer(1, 3, GL_UNSIGNED_INT, GL_FALSE, currentStride, 0);
+	currentStreamSource->PrepareForXyzrhwDiffuse(currentStride);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(XyzrhwDiffuseConverted), 0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(XyzrhwDiffuseConverted), (void *)(4 * sizeof(FLOAT)));
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	DebugPrintf("Drawing %d triangle fans\n", PrimitiveCount);
-	glDrawArrays ( GL_TRIANGLE_FAN, 0, 2 + PrimitiveCount );
+	glDrawArrays ( GL_TRIANGLE_FAN, StartVertex, 2 + PrimitiveCount );
 }
 
 static IDirect3DDevice9 *globalDirect3DDevice;
