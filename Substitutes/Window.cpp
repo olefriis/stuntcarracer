@@ -8,7 +8,7 @@ static D3DSURFACE_DESC surfaceDescription;
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
 	Debug("DXUTCreateWindow");
 
-	esCreateWindow(&esContext, "Stunt Car Racer", 320, 240, ES_WINDOW_RGB);
+	esCreateWindow(&esContext, "Stunt Car Racer", 320, 240, ES_WINDOW_RGB | ES_WINDOW_DEPTH);
 
 	surfaceDescription.Width = esContext.width;
 	surfaceDescription.Height = esContext.height;

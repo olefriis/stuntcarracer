@@ -50,7 +50,7 @@ D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
 	// Row 4
 	pOut->_41 = 0;
 	pOut->_42 = 0;
-	pOut->_43 = 2*zn*zf / (zf - zn); // '2*' added to make it fit into the OpenGL 2x2x2 visible cube
+	pOut->_43 = -zn*zf / (zf - zn);
 	pOut->_44 = 0;
 
 	return pOut;

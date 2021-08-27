@@ -82,8 +82,11 @@ void setUpShadersForXyzDiffuseTexture() {
 		"void main() {\n"
 		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
 		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
-		"   gl_Position = transformedPosition / transformedPosition.w;\n"
-		"   gl_Position.y *= -1.0;\n" // Accomodate for DirectX top-left origin
+		"   gl_Position = vec4(\n"
+		"     transformedPosition.x / transformedPosition.w,\n"
+		"     -transformedPosition.y / transformedPosition.w,\n" // Invert Y because DirectX and OpenGL have opposite Y axis
+		"     1.0 - transformedPosition.z / transformedPosition.w,\n" // Reverse Z to make the default depth test work correctly
+		"     1.0);\n"
 		"   outputColor = vColor;\n"
 		"}\n";
 	const char *fragmentShaderStringForXyzDiffuseTexture =  
@@ -212,19 +215,19 @@ HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) 
 	if (State == D3DRS_CULLMODE) {
 		if (Value == D3DCULL_NONE) {
 			glDisable(GL_CULL_FACE);
-		} else if (Value == D3DCULL_CW) {
-			glEnable(GL_CULL_FACE);
-			glCullFace(GL_BACK);
 		} else if (Value == D3DCULL_CCW) {
-			glEnable(GL_CULL_FACE);
+			glFrontFace(GL_CCW);
 			glCullFace(GL_FRONT);
+			glEnable(GL_CULL_FACE);
 		} else {
 			ErrorPrintf("Unknown cull mode: %lu", Value);
 		}
 	} else if (State == D3DRS_ZENABLE) {
 		if (Value == TRUE) {
+			glDepthMask(GL_TRUE);
 			glEnable(GL_DEPTH_TEST);
 		} else {
+			glDepthMask(GL_FALSE);
 			glDisable(GL_DEPTH_TEST);
 		}
 	} else {
@@ -257,6 +260,7 @@ HRESULT IDirect3DDevice9::EndScene() {
 HRESULT IDirect3DDevice9::Clear(DWORD Count, const D3DRECT *pRects, DWORD Flags, D3DCOLOR Color, float Z, DWORD Stencil) {
 	DebugPrintf("IDirect3DDevice9::Clear(count=%ld, Color=%ld)\n", Count, Color);
 	if (Flags == D3DCLEAR_ZBUFFER) {
+		glClearDepth(Z);
 		glClear ( GL_DEPTH_BUFFER_BIT );
 		return S_OK;
 	} else if (Flags == D3DCLEAR_TARGET) {
