@@ -115,6 +115,7 @@ typedef struct tagPALETTEENTRY {
 
 // Virtual-Key Codes: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 // F keys
+#define VK_F1 0x71
 #define VK_F2 0x71
 #define VK_F4 0x73
 #define VK_F5 0x74
