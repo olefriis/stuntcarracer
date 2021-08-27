@@ -67,10 +67,9 @@ EM_BOOL one_iter(double time, void* userData) {
 	}
 
 	// Return true to keep the loop running.
-	//return EM_TRUE;
-	// Well, return false right now to allow for some debugging
-	puts("Iteration done");
-	return EM_FALSE;
+	return EM_TRUE;
+	//puts("Iteration done");
+	//return EM_FALSE;
 }
 
 

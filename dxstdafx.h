@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <iostream>
 
-#define DEBUG_ENABLED 1
+#define DEBUG_ENABLED 0
 #define ERROR_ENABLED 1
 
 #if DEBUG_ENABLED
