@@ -59,6 +59,7 @@ void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUser
 EM_BOOL one_iter(double time, void* userData) {
 	// Can render to the screen here, etc.
 	Debug("One iteration");
+	setCurrentTime(time);
 
 	if (frameMoveCallback) {
 		frameMoveCallback(DXUTGetD3DDevice(), time, time, null);

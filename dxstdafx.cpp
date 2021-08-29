@@ -70,9 +70,16 @@ IDirect3D9* DXUTGetD3DObject() {
   return NULL;
 }
 
+static double currentTime = 0;
+
 double DXUTGetTime() {
   Debug("DXUTGetTime");
-  return 0;
+  return currentTime;
+}
+
+// For our own use
+void setCurrentTime(double time) {
+	currentTime = time;
 }
 
 void DXUTDisplaySwitchingToREFWarning() {

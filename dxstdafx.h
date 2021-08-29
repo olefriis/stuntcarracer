@@ -324,6 +324,7 @@ LPCWSTR DXUTGetDeviceStats();
 IDirect3D9* DXUTGetD3DObject();
 
 double DXUTGetTime();
+void setCurrentTime(double time);
 
 void DXUTDisplaySwitchingToREFWarning();
 
