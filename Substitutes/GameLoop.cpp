@@ -120,6 +120,17 @@ EM_BOOL key_callback(int eventType, const EmscriptenKeyboardEvent *e, void *user
 	return 0;
 }
 
+EM_BOOL resize_callback(int eventType, const EmscriptenUiEvent *e, void *userData) {
+	ErrorPrintf("Resize callback: %d, %d\n", e->windowInnerWidth, e->windowInnerHeight);
+	windowResized(e->windowInnerWidth, e->windowInnerHeight);
+	return 0;
+}
+
+EM_JS(void, call_alert, (), {
+	specialHTMLTargets["!canvas"] = Module.canvas;
+	alert('hello world!');
+});
+
 int main() {
 	Debug("Main function!");
 	if (WinMain( NULL, NULL, NULL, NULL ) == FALSE) {
@@ -134,6 +145,9 @@ int main() {
 	}
   	if (emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, key_callback) != EMSCRIPTEN_RESULT_SUCCESS) {
 		Error("emscripten_set_keyup_callback failed");
+	}
+	if (emscripten_set_resize_callback("canvas", 0, 1, resize_callback) != EMSCRIPTEN_RESULT_SUCCESS) {
+		Error("emscripten_set_resize_callback failed");
 	}
 
 	if (deviceResetCallback) {

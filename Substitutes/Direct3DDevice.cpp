@@ -1,5 +1,4 @@
 #include "../dxstdafx.h"
-#include "esUtil.h"
 #include "SDL/SDL_opengl.h"
 #include <GL/glut.h>
 
@@ -15,51 +14,38 @@ void PrintMatrix(const char *name, const D3DMATRIX *m) {
 	DebugPrintf("\n");
 }
 
-///
-// Create a shader object, load the shader source, and
-// compile the shader.
-//
-GLuint LoadShader ( GLenum type, const char *shaderSrc )
-{
-   GLuint shader;
-   GLint compiled;
-   
-   // Create the shader object
-   shader = glCreateShader ( type );
+GLuint LoadShader(GLenum type, const char *shaderSrc) {
+	GLuint shader = glCreateShader(type);
 
-   if ( shader == 0 )
-   	return 0;
+	if (shader == 0) {
+		return 0;
+	}
 
-   // Load the shader source
-   glShaderSource ( shader, 1, &shaderSrc, NULL );
-   
-   // Compile the shader
-   glCompileShader ( shader );
+	glShaderSource(shader, 1, &shaderSrc, NULL);
+	glCompileShader(shader);
 
-   // Check the compile status
-   glGetShaderiv ( shader, GL_COMPILE_STATUS, &compiled );
+	// Check the compile status
+	GLint compiled;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
 
-   if ( !compiled ) 
-   {
-      GLint infoLen = 0;
+	if (!compiled) {
+		GLint infoLen = 0;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
 
-      glGetShaderiv ( shader, GL_INFO_LOG_LENGTH, &infoLen );
-      
-      if ( infoLen > 1 )
-      {
-         char* infoLog = (char *)malloc (sizeof(char) * infoLen );
+		if (infoLen > 0) {
+			char* infoLog = (char *)malloc(sizeof(char) * infoLen);
 
-         glGetShaderInfoLog ( shader, infoLen, NULL, infoLog );
-         esLogMessage ( "Error compiling shader:\n%s\n", infoLog );            
-         
-         free ( infoLog );
-      }
+			glGetShaderInfoLog(shader, infoLen, NULL, infoLog);
+			ErrorPrintf( "Error compiling shader:\n%s\n", infoLog);
 
-      glDeleteShader ( shader );
-      return 0;
-   }
+			free(infoLog);
+		}
 
-   return shader;
+		glDeleteShader(shader);
+		return 0;
+	}
+
+	return shader;
 }
 
 static GLuint programObjectForXyzDiffuseTexture;

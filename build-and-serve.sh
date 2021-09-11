@@ -13,7 +13,6 @@ emcc \
  wavefunctions.cpp \
  Backdrop.cpp \
  Substitutes/*.cpp \
- Substitutes/*.c \
  -ferror-limit=1000 \
  -s LLD_REPORT_UNDEFINED \
  -o source.html \
