@@ -14,12 +14,17 @@ SDL_Window* gWindow = NULL;
 //OpenGL context
 SDL_GLContext glContext;
 
+EM_JS(UINT, get_canvas_width, (), { return canvas.width; })
+EM_JS(UINT, get_canvas_height, (), { return canvas.height; })
+EM_JS(UINT, initial_canvas_width, (), { return window.production ? window.innerWidth : 320; })
+EM_JS(UINT, initial_canvas_height, (), { return window.production ? window.innerHeight : 240; })
+
 // Thanks to https://codingtidbit.com/2019/08/24/bring-your-c-opengl-code-to-the-web/ for tips!
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
 	Debug("DXUTCreateWindow");
 
-	surfaceDescription.Width = 320;
-	surfaceDescription.Height = 240;
+	surfaceDescription.Width = initial_canvas_width();
+	surfaceDescription.Height = initial_canvas_height();
 
 	emscripten_set_canvas_element_size("#canvas", surfaceDescription.Width, surfaceDescription.Height);
 	EmscriptenWebGLContextAttributes attr;
@@ -40,18 +45,22 @@ HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
 		return E_FAIL;
 	}
 
-	//glViewport(0, 0, surfaceDescription.Width, surfaceDescription.Height);
-
 	return S_OK;
+}
+
+void updateCanvasSize() {
+	UINT newWidth = get_canvas_width();
+	UINT newHeight = get_canvas_height();
+
+	if (newWidth != surfaceDescription.Width || newHeight != surfaceDescription.Height) {
+		ErrorPrintf("Resizing canvas to %d x %d\n", newWidth, newHeight);
+		surfaceDescription.Width = newWidth;
+		surfaceDescription.Height = newHeight;
+		glViewport(0, 0, surfaceDescription.Width, surfaceDescription.Height);
+	}
 }
 
 CONST D3DSURFACE_DESC * DXUTGetBackBufferSurfaceDesc() {
 	Debug("DXUTGetBackBufferSurfaceDesc");
 	return &surfaceDescription;
-}
-
-void windowResized(int width, int height) {
-	Debug("windowResized");
-	surfaceDescription.Width = width;
-	surfaceDescription.Height = height;
 }

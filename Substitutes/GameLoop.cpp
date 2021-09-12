@@ -52,7 +52,6 @@ void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUser
 	Debug("DXUTSetCallbackMsgProc");
 }
 
-
 // Our "main loop" function. This callback receives the current time as
 // reported by the browser, and the user data we provide in the call to
 // emscripten_request_animation_frame_loop().
@@ -60,6 +59,7 @@ EM_BOOL one_iter(double time, void* userData) {
 	// Can render to the screen here, etc.
 	Debug("One iteration");
 	setCurrentTime(time);
+	updateCanvasSize();
 
 	if (frameMoveCallback) {
 		frameMoveCallback(DXUTGetD3DDevice(), time, time, null);
@@ -120,12 +120,6 @@ EM_BOOL key_callback(int eventType, const EmscriptenKeyboardEvent *e, void *user
 	return 0;
 }
 
-EM_BOOL resize_callback(int eventType, const EmscriptenUiEvent *e, void *userData) {
-	ErrorPrintf("Resize callback: %d, %d\n", e->windowInnerWidth, e->windowInnerHeight);
-	windowResized(e->windowInnerWidth, e->windowInnerHeight);
-	return 0;
-}
-
 EM_JS(void, call_alert, (), {
 	specialHTMLTargets["!canvas"] = Module.canvas;
 	alert('hello world!');
@@ -145,9 +139,6 @@ int main() {
 	}
   	if (emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, key_callback) != EMSCRIPTEN_RESULT_SUCCESS) {
 		Error("emscripten_set_keyup_callback failed");
-	}
-	if (emscripten_set_resize_callback("canvas", 0, 1, resize_callback) != EMSCRIPTEN_RESULT_SUCCESS) {
-		Error("emscripten_set_resize_callback failed");
 	}
 
 	if (deviceResetCallback) {
