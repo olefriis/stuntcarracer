@@ -76,13 +76,10 @@ void setUpShadersForXyzDiffuseTexture() {
 		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
 		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
 		"   gl_Position = vec4(\n"
-		"     transformedPosition.x / transformedPosition.w,\n"
-		"     -transformedPosition.y / transformedPosition.w,\n" // Invert Y because DirectX and OpenGL have opposite Y axis
-		"     1.0 - transformedPosition.z / transformedPosition.w,\n" // Reverse Z to make the default depth test work correctly
-		"     1.0);\n"
-		"   if (transformedPosition.w > 0.0) {\n" // Ensure signs survive the homogenous transformation
-		"     gl_Position *= -1.0;\n"
-		"   }\n"
+		"     -transformedPosition.x,\n"
+		"     transformedPosition.y,\n"
+		"     -(2.0*transformedPosition.w - transformedPosition.z),\n" // Magic, I guess - make the default depth test work correctly
+		"     -transformedPosition.w);\n"
 		"   outputColor = vColor;\n"
 		"   vTextureCoord = aTextureCoord;\n"
 		"}\n";
