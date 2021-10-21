@@ -1,5 +1,4 @@
 #include "../dxstdafx.h"
-#include <cmath>
 
 double cotan(double i) { return(1 / tan(i)); }
 double dot(const D3DXVECTOR3 *v1, const D3DXVECTOR3 *v2) { return(v1->x * v2->x + v1->y * v2->y + v1->z * v2->z); }

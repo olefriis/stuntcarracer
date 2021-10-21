@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
+#include <math.h>      
 
 #define DEBUG_ENABLED 0
 #define ERROR_ENABLED 1
@@ -192,46 +193,11 @@ typedef enum D3DTEXTUREOP {
 } D3DTEXTUREOP, *LPD3DTEXTUREOP;
 
 #include "Substitutes/Direct3DVertexBuffer.h"
-
-typedef struct D3DCAPS9 {
-  D3DDEVTYPE DeviceType;
-  UINT       AdapterOrdinal;
-} D3DCAPS9;
-typedef struct D3DFORMAT {
-  FLOAT something;
-} D3DFORMAT;
-
-class IDirect3DBaseTexture9 {
-  public:
-};
-class IDirect3DTexture9 : public IDirect3DBaseTexture9 {
-  public:
-  virtual void Release();
-};
-typedef IDirect3DTexture9 *LPDIRECT3DTEXTURE9;
-
-typedef struct D3DVECTOR {
-  FLOAT x;
-  FLOAT y;
-  FLOAT z;
-} D3DVECTOR, *LPD3DXVECTOR3;
-
-typedef struct D3DXVECTOR3 : public D3DVECTOR
-{
-public:
-    D3DXVECTOR3() {};
-    D3DXVECTOR3( FLOAT x, FLOAT y, FLOAT z ) {
-		this->x = x;
-		this->y = y;
-		this->z = z;
-	};
-} D3DXVECTOR3;
-
+#include "Substitutes/Vector.h"
 #include "Substitutes/Matrix.h"
 #include "Substitutes/Direct3DDevice.h"
-typedef struct DXUTDeviceSettings {
-  D3DDEVTYPE DeviceType;
-} DXUTDeviceSettings;
+#include "Substitutes/Texture.h"
+
 class IDirect3D9 {
   public:
   virtual HRESULT CheckDeviceFormat(
@@ -305,13 +271,6 @@ typedef struct D3DSURFACE_DESC {
 HRESULT D3DXCreateSprite(
   LPDIRECT3DDEVICE9 pDevice,
   LPD3DXSPRITE      *ppSprite
-);
-
-HRESULT D3DXCreateTextureFromResource(
-  LPDIRECT3DDEVICE9  pDevice,
-  HMODULE            hSrcModule,
-  LPCTSTR            pSrcResource,
-  LPDIRECT3DTEXTURE9 *ppTexture
 );
 
 HWND DXUTGetHWND();

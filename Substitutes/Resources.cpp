@@ -9,7 +9,7 @@
  * Maybe that's an issue, maybe it isn't.)
  * 
  * LoadResource will return NULL if the resource cannot be loaded, which is according to specs. However,
- * if the resource can be loaded, it will just return a raws pointer to the resource data.
+ * if the resource can be loaded, it will just return a raw pointer to the resource data.
  * 
  * Finally, LockResource will just return what it is given in the hResData parameter, since it has already
  * been loaded.

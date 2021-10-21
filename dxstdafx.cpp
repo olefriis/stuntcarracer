@@ -40,16 +40,6 @@ HRESULT D3DXCreateSprite(
   return S_OK;
 }
 
-HRESULT D3DXCreateTextureFromResource(
-  LPDIRECT3DDEVICE9  pDevice,
-  HMODULE            hSrcModule,
-  LPCTSTR            pSrcResource,
-  LPDIRECT3DTEXTURE9 *ppTexture
-) {
-  Debug("D3DXCreateTextureFromResource");
-  return S_OK;
-}
-
 HWND DXUTGetHWND() {
   Debug("DXUTGetHWND");
   return NULL;

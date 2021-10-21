@@ -48,10 +48,15 @@ GLuint LoadShader(GLenum type, const char *shaderSrc) {
 	return shader;
 }
 
+// glIsEnabled(GL_TEXTURE_2D) seems to always return false, so we need to store this separately
+static BOOL textureEnabled = FALSE;
+
 static GLuint programObjectForXyzDiffuseTexture;
 static GLint projectionMatrixLocationForXyzDiffuseTexture;
 static GLint viewMatrixLocationForXyzDiffuseTexture;
 static GLint worldMatrixLocationForXyzDiffuseTexture;
+static GLint samplerForXyzDiffuseTexture;
+static GLint textureWeightForXyzDiffuseTexture;
 
 static GLuint programObjectForXyzrhwDiffuse;
 static GLint windowWidthLocationForXyzrhwDiffuse;
@@ -61,10 +66,12 @@ void setUpShadersForXyzDiffuseTexture() {
 	const char *vertexShaderStringForXyzDiffuseTexture =
 		"attribute vec3 vPosition;\n"
 		"attribute vec4 vColor;\n"
+		"attribute vec2 aTextureCoord;\n"
 		"uniform mat4 projectionMatrix;\n"
 		"uniform mat4 viewMatrix;\n"
 		"uniform mat4 worldMatrix;\n"
 		"varying lowp vec4 outputColor;\n"
+		"varying lowp vec2 vTextureCoord;\n"
 		"void main() {\n"
 		"   vec4 homogenousPosition = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);\n"
 		"   vec4 transformedPosition = homogenousPosition * worldMatrix * viewMatrix * projectionMatrix;\n"
@@ -77,12 +84,16 @@ void setUpShadersForXyzDiffuseTexture() {
 		"     gl_Position *= -1.0;\n"
 		"   }\n"
 		"   outputColor = vColor;\n"
+		"   vTextureCoord = aTextureCoord;\n"
 		"}\n";
 	const char *fragmentShaderStringForXyzDiffuseTexture =  
 		"precision mediump float;\n"
+		"uniform float textureWeight;\n"
+		"uniform sampler2D uSampler;\n"
 		"varying lowp vec4 outputColor;\n"
+		"varying lowp vec2 vTextureCoord;\n"
 		"void main() {\n"
-		"   gl_FragColor = outputColor;\n"
+		"   gl_FragColor = (1.0 - textureWeight) * outputColor + textureWeight * texture2D(uSampler, vTextureCoord);\n"
 		"}\n";
 	GLuint vertexShaderForXyzDiffuseTexture = LoadShader ( GL_VERTEX_SHADER, vertexShaderStringForXyzDiffuseTexture );
 	GLuint fragmentShaderForXyzDiffuseTexture = LoadShader ( GL_FRAGMENT_SHADER, fragmentShaderStringForXyzDiffuseTexture );
@@ -99,17 +110,17 @@ void setUpShadersForXyzDiffuseTexture() {
 	// Link the program
 	glLinkProgram ( programObjectForXyzDiffuseTexture );
 
-	// Bind vPosition to attribute 0 and vColor to attribute 1
+	// Bind vPosition to attribute 0, vColor to attribute 1, aTextureCoord to attribute 2
 	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 0, "vPosition" );
 	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 1, "vColor" );
+	glBindAttribLocation ( programObjectForXyzDiffuseTexture, 2, "aTextureCoord" );
 
 	// Get the uniform locations
 	projectionMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "projectionMatrix");
 	viewMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "viewMatrix");
 	worldMatrixLocationForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "worldMatrix");
-	DebugPrintf("projectionMatrixLocation: %d\n", projectionMatrixLocationForXyzDiffuseTexture);
-	DebugPrintf("viewMatrixLocation: %d\n", viewMatrixLocationForXyzDiffuseTexture);
-	DebugPrintf("worldMatrixLocation: %d\n", worldMatrixLocationForXyzDiffuseTexture);
+	samplerForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "uSampler");
+	textureWeightForXyzDiffuseTexture = glGetUniformLocation(programObjectForXyzDiffuseTexture, "textureWeight");
 
 	// Check the link status
 	GLint linked;
@@ -228,11 +239,48 @@ HRESULT IDirect3DDevice9::SetRenderState(D3DRENDERSTATETYPE State, DWORD Value) 
 
 HRESULT IDirect3DDevice9::SetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATETYPE Type, DWORD Value) {
 	Debug("IDirect3DDevice9::SetTextureStageState");
-	return S_OK;
+	if (Stage == 1 && Type == D3DTSS_COLOROP && Value == D3DTOP_DISABLE) {
+		// Just ignore this.
+		return S_OK;
+	}
+
+	if (Stage != 0) {
+		Error("Only stage 0 is supported");
+		return E_FAIL;
+	}
+	switch (Type) {
+	case D3DTSS_COLOROP:
+		if (Value == D3DTOP_DISABLE) {
+			textureEnabled = FALSE;
+			glDisable(GL_TEXTURE_2D);
+		} else if (Value == D3DTOP_SELECTARG1) {
+			textureEnabled = TRUE;
+			glEnable(GL_TEXTURE_2D);
+		} else {
+			ErrorPrintf("Unknown texture stage state type: %d\n", Type);
+		}
+		return S_OK;
+
+	case D3DTSS_COLORARG1:
+	case D3DTSS_COLORARG2:
+	case D3DTSS_ALPHAOP:
+		// Ignore these
+		return S_OK;
+
+	default:
+		ErrorPrintf("Unknown texture stage state type: %d\n", Type);
+		return E_FAIL;
+	}
 }
 
 HRESULT IDirect3DDevice9::SetTexture(DWORD Stage, IDirect3DBaseTexture9 *pTexture) {
 	Debug("IDirect3DDevice9::SetTexture");
+	if (Stage != 0) {
+		Error("Only stage 0 is supported");
+		return E_FAIL;
+	}
+	glBindTexture(GL_TEXTURE_2D, pTexture->textureId);
+	glActiveTexture(GL_TEXTURE0);
 	return S_OK;
 }
 
@@ -366,12 +414,18 @@ void IDirect3DDevice9::DrawTriangleListForXyzDiffuseTexture(UINT StartVertex, UI
 	glUniformMatrix4fv(projectionMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&projectionMatrix.glFloats[0]);
 	glUniformMatrix4fv(viewMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&viewMatrix.glFloats[0]);
 	glUniformMatrix4fv(worldMatrixLocationForXyzDiffuseTexture, 1, GL_FALSE, (GLfloat *)&worldMatrix.glFloats[0]);
+	glUniform1i(samplerForXyzDiffuseTexture, 0);
+	glUniform1f(textureWeightForXyzDiffuseTexture, textureEnabled ? 1.0 : 0.0);
 
 	currentStreamSource->PrepareForForXyzDiffuseTexture(currentStride);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(XyzDiffuseTextureConverted), 0);
+	// Skip the first 3 floats (x, y, z)
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(XyzDiffuseTextureConverted), (void *)(3 * sizeof(FLOAT)));
+	// Skip the first 3 floats (x, y, z) and the next 4 floats (color)
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(XyzDiffuseTextureConverted), (void *)(7 * sizeof(FLOAT)));
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
 
 	DebugPrintf("Drawing %d triangles\n", PrimitiveCount);
 	glDrawArrays ( GL_TRIANGLES, StartVertex, PrimitiveCount * 3 );

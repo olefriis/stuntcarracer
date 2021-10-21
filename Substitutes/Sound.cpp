@@ -1,4 +1,3 @@
-
 #include "../dxstdafx.h"
 
 HRESULT DirectSoundCreate8( LPCGUID lpcGuidDevice, LPDIRECTSOUND8 * ppDS8, LPUNKNOWN pUnkOuter ) {

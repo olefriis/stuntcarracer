@@ -1,3 +1,7 @@
+typedef struct DXUTDeviceSettings {
+  D3DDEVTYPE DeviceType;
+} DXUTDeviceSettings;
+
 typedef enum D3DTRANSFORMSTATETYPE { 
 	D3DTS_VIEW         = 2,
 	D3DTS_PROJECTION   = 3,
@@ -174,6 +178,27 @@ typedef enum D3DPOOL {
 
 // D3DUSAGE: https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dusage
 #define D3DUSAGE_WRITEONLY 1
+
+class IDirect3DBaseTexture9 {
+  public:
+  unsigned int textureId;
+};
+class IDirect3DTexture9 : public IDirect3DBaseTexture9 {
+  public:
+  IDirect3DTexture9(unsigned int textureId) {
+	this->textureId = textureId;
+  }
+  void Release() {}
+};
+typedef IDirect3DTexture9 *LPDIRECT3DTEXTURE9;
+
+typedef struct D3DCAPS9 {
+  D3DDEVTYPE DeviceType;
+  UINT       AdapterOrdinal;
+} D3DCAPS9;
+typedef struct D3DFORMAT {
+  FLOAT something;
+} D3DFORMAT;
 
 typedef enum D3DPRIMITIVETYPE { 
 	D3DPT_LINELIST       = 2,
