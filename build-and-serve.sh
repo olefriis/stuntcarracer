@@ -19,13 +19,15 @@ emcc \
  Substitutes/*.cpp \
  -ferror-limit=1000 \
  -s LLD_REPORT_UNDEFINED \
+ -lopenal \
  --use-preload-plugins \
  -s USE_SDL_IMAGE=2 \
  -s SDL2_IMAGE_FORMATS='["bmp"]' \
  -o source.html \
  $shell_file_parameter \
  --embed-file Tracks \
- --embed-file Bitmap
+ --embed-file Bitmap \
+ --embed-file Sounds
 
 echo 'Build succeeded. Now serving the result on http://localhost:8000/source.html'
 

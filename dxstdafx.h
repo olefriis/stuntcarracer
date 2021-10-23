@@ -32,6 +32,7 @@ typedef int INT;
 typedef unsigned int UINT;
 typedef float FLOAT;
 typedef unsigned long DWORD, *PDWORD, *LPDWORD;
+typedef unsigned short WORD;
 typedef long LONG, *PLONG, *LPLONG;
 typedef wchar_t WCHAR, *PWCHAR;
 typedef long LONG_PTR;
@@ -347,6 +348,12 @@ HRESULT D3DXCreateFont(
 #endif
 #ifndef SAFE_RELEASE
 #define SAFE_RELEASE(p) { if ( (p) ) { (p)->Release(); (p) = 0; } }
+#endif
+#ifndef ZeroMemory
+#define ZeroMemory(p, s) memset((p), 0, (s))
+#endif
+#ifndef CopyMemory
+#define CopyMemory(d, s, sz) memcpy((d), (s), (sz))
 #endif
 
 // From the Windows API: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/time-time32-time64?view=msvc-160

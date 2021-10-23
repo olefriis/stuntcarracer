@@ -146,54 +146,54 @@ bool DSSetMode()
 
 	// Amiga channels 1 and 2 are right side, channels 0 and 3 are left side
 
-	if ((WreckSoundBuffer = MakeSoundBuffer(ds, L"WRECK")) == NULL)
+	if ((WreckSoundBuffer = MakeSoundBuffer(ds, L"Wreck")) == NULL)
 		return FALSE;
 	WreckSoundBuffer->SetPan(DSBPAN_RIGHT);
 	WreckSoundBuffer->SetVolume(AmigaVolumeToDirectX(64));
 
-	if ((HitCarSoundBuffer = MakeSoundBuffer(ds, L"HITCAR")) == NULL)
+	if ((HitCarSoundBuffer = MakeSoundBuffer(ds, L"HitCar")) == NULL)
 		return FALSE;
 	HitCarSoundBuffer->SetFrequency(AMIGA_PAL_HZ / 238);
 	HitCarSoundBuffer->SetPan(DSBPAN_RIGHT);
 	HitCarSoundBuffer->SetVolume(AmigaVolumeToDirectX(56));
 
-	if ((GroundedSoundBuffer = MakeSoundBuffer(ds, L"GROUNDED")) == NULL)
+	if ((GroundedSoundBuffer = MakeSoundBuffer(ds, L"Grounded")) == NULL)
 		return FALSE;
 	GroundedSoundBuffer->SetFrequency(AMIGA_PAL_HZ / 400);
 	GroundedSoundBuffer->SetPan(DSBPAN_RIGHT);
 
-	if ((CreakSoundBuffer = MakeSoundBuffer(ds, L"CREAK")) == NULL)
+	if ((CreakSoundBuffer = MakeSoundBuffer(ds, L"Creak")) == NULL)
 		return FALSE;
 	CreakSoundBuffer->SetFrequency(AMIGA_PAL_HZ / 238);
 	CreakSoundBuffer->SetPan(DSBPAN_RIGHT);
 	CreakSoundBuffer->SetVolume(AmigaVolumeToDirectX(64));
 
-	if ((SmashSoundBuffer = MakeSoundBuffer(ds, L"SMASH")) == NULL)
+	if ((SmashSoundBuffer = MakeSoundBuffer(ds, L"Smash")) == NULL)
 		return FALSE;
 	SmashSoundBuffer->SetFrequency(AMIGA_PAL_HZ / 280);
 	SmashSoundBuffer->SetPan(DSBPAN_LEFT);
 	SmashSoundBuffer->SetVolume(AmigaVolumeToDirectX(64));
 
-	if ((OffRoadSoundBuffer = MakeSoundBuffer(ds, L"OFFROAD")) == NULL)
+	if ((OffRoadSoundBuffer = MakeSoundBuffer(ds, L"OffRoad")) == NULL)
 		return FALSE;
 	OffRoadSoundBuffer->SetPan(DSBPAN_RIGHT);
 	OffRoadSoundBuffer->SetVolume(AmigaVolumeToDirectX(64));
 
-	if ((EngineSoundBuffers[0] = MakeSoundBuffer(ds, L"TICKOVER")) == NULL)
+	if ((EngineSoundBuffers[0] = MakeSoundBuffer(ds, L"TickOver")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[1] = MakeSoundBuffer(ds, L"ENGINEPITCH2")) == NULL)
+	if ((EngineSoundBuffers[1] = MakeSoundBuffer(ds, L"EnginePitch2")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[2] = MakeSoundBuffer(ds, L"ENGINEPITCH3")) == NULL)
+	if ((EngineSoundBuffers[2] = MakeSoundBuffer(ds, L"EnginePitch3")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[3] = MakeSoundBuffer(ds, L"ENGINEPITCH4")) == NULL)
+	if ((EngineSoundBuffers[3] = MakeSoundBuffer(ds, L"EnginePitch4")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[4] = MakeSoundBuffer(ds, L"ENGINEPITCH5")) == NULL)
+	if ((EngineSoundBuffers[4] = MakeSoundBuffer(ds, L"EnginePitch5")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[5] = MakeSoundBuffer(ds, L"ENGINEPITCH6")) == NULL)
+	if ((EngineSoundBuffers[5] = MakeSoundBuffer(ds, L"EnginePitch6")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[6] = MakeSoundBuffer(ds, L"ENGINEPITCH7")) == NULL)
+	if ((EngineSoundBuffers[6] = MakeSoundBuffer(ds, L"EnginePitch7")) == NULL)
 		return FALSE;
-	if ((EngineSoundBuffers[7] = MakeSoundBuffer(ds, L"ENGINEPITCH8")) == NULL)
+	if ((EngineSoundBuffers[7] = MakeSoundBuffer(ds, L"EnginePitch8")) == NULL)
 		return FALSE;
 
 	for (i = 0; i < 8; i++)

@@ -127,6 +127,8 @@ EM_JS(void, call_alert, (), {
 
 int main() {
 	Debug("Main function!");
+	SetUpDirectSound();
+
 	if (WinMain( NULL, NULL, NULL, NULL ) == FALSE) {
 		Error("WinMain failed");
 		return 0;
