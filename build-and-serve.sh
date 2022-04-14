@@ -31,4 +31,4 @@ emcc \
 
 echo 'Build succeeded. Now serving the result on http://localhost:8000/source.html'
 
-python -m SimpleHTTPServer
+python3 -m http.server
