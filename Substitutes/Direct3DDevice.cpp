@@ -48,7 +48,7 @@ GLuint LoadShader(GLenum type, const char *shaderSrc) {
 	return shader;
 }
 
-// glIsEnabled(GL_TEXTURE_2D) seems to always return false, so we need to store this separately
+// Setting and getting the GL_TEXTURE_2D capability is not supported in WebGL 2.0 it seems, so we just keep track of this ourselves
 static BOOL textureEnabled = FALSE;
 
 static GLuint programObjectForXyzDiffuseTexture;
@@ -249,10 +249,8 @@ HRESULT IDirect3DDevice9::SetTextureStageState(DWORD Stage, D3DTEXTURESTAGESTATE
 	case D3DTSS_COLOROP:
 		if (Value == D3DTOP_DISABLE) {
 			textureEnabled = FALSE;
-			glDisable(GL_TEXTURE_2D);
 		} else if (Value == D3DTOP_SELECTARG1) {
 			textureEnabled = TRUE;
-			glEnable(GL_TEXTURE_2D);
 		} else {
 			ErrorPrintf("Unknown texture stage state type: %d\n", Type);
 		}
@@ -276,8 +274,8 @@ HRESULT IDirect3DDevice9::SetTexture(DWORD Stage, IDirect3DBaseTexture9 *pTextur
 		Error("Only stage 0 is supported");
 		return E_FAIL;
 	}
-	glBindTexture(GL_TEXTURE_2D, pTexture->textureId);
 	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, pTexture->textureId);
 	return S_OK;
 }
 

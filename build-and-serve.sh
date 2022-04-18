@@ -23,6 +23,7 @@ emcc \
  --use-preload-plugins \
  -s USE_SDL_IMAGE=2 \
  -s SDL2_IMAGE_FORMATS='["bmp"]' \
+ -s MAX_WEBGL_VERSION=2 \
  -o source.html \
  $shell_file_parameter \
  --embed-file Tracks \
