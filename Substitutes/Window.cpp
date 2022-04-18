@@ -57,6 +57,14 @@ void updateCanvasSize() {
 		surfaceDescription.Width = newWidth;
 		surfaceDescription.Height = newHeight;
 		glViewport(0, 0, surfaceDescription.Width, surfaceDescription.Height);
+
+		// Set the projection transform (view and world are updated per frame)
+		// This snippet has been taken from OnResetDevice in StuntCarRacer.cpp
+		FLOAT fAspect = newWidth / (FLOAT)newHeight;
+		FLOAT furthestZ = 131072.0f;
+		D3DXMATRIX matProj;
+		D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI/4, fAspect, 0.5f, furthestZ);
+		DXUTGetD3DDevice()->SetTransform(D3DTS_PROJECTION, &matProj);
 	}
 }
 
