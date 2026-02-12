@@ -47,7 +47,6 @@ typedef wchar_t *LPTSTR;
 typedef unsigned int UINT_PTR;
 typedef UINT_PTR WPARAM;
 typedef LONG_PTR LPARAM;
-typedef unsigned long size_t;
 typedef char CHAR;
 typedef CHAR *LPSTR;
 typedef HANDLE HINSTANCE;
@@ -356,10 +355,6 @@ HRESULT D3DXCreateFont(
 #define CopyMemory(d, s, sz) memcpy((d), (s), (sz))
 #endif
 
-// From the Windows API: https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/time-time32-time64?view=msvc-160
-// Also see https://en.cppreference.com/w/c/chrono/time_t
-typedef long time_t;
-time_t time( time_t *destTime );
-void srand(unsigned int seed);
+#include <time.h>
 
 HRESULT StringCchPrintf( LPTSTR pszDest, size_t cchDest, LPCTSTR pszFormat, ... );

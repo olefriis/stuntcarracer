@@ -1,5 +1,5 @@
 #include "../dxstdafx.h"
-#include "SDL/SDL_opengl.h"
+#include "SDL2/SDL_opengl.h"
 #include <GL/glut.h>
 
 #define XYZRHW_DIFFUSE (D3DFVF_XYZRHW | D3DFVF_DIFFUSE)
