@@ -24,7 +24,11 @@
 // Defines, constants, and global variables
 //-----------------------------------------------------------------------------
 
+#ifdef __EMSCRIPTEN__
+#define DEFAULT_FRAME_GAP	(1)		// Emscripten loop is already capped at ~60fps by requestAnimationFrame, so no need to skip frames
+#else
 #define DEFAULT_FRAME_GAP	(4)		// Used to limit frame rate.  Amiga StuntCarRacer uses value of 6 (called MIN.FRAMES)
+#endif
 
 #define	HEIGHT_ABOVE_ROAD	(100)
 
