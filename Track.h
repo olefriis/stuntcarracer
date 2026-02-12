@@ -97,6 +97,7 @@ extern HRESULT CreateTrackVertexBuffer (IDirect3DDevice9 *pd3dDevice);
 extern void FreeTrackVertexBuffer (void);
 
 extern void DrawTrack (IDirect3DDevice9 *pd3dDevice);
+extern void DrawShadow (IDirect3DDevice9 *pd3dDevice);
 
 extern HRESULT CreateShadowVertexBuffer (IDirect3DDevice9 *pd3dDevice);
 

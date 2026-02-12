@@ -55,18 +55,27 @@ void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUser
 // Our "main loop" function. This callback receives the current time as
 // reported by the browser, and the user data we provide in the call to
 // emscripten_request_animation_frame_loop().
+static double lastTime = 0;
+
 EM_BOOL one_iter(double time, void* userData) {
 	// Can render to the screen here, etc.
 	Debug("One iteration");
 	setCurrentTime(time);
 	updateCanvasSize();
 
+	// Calculate elapsed time in seconds (emscripten_request_animation_frame_loop passes milliseconds)
+	double elapsedMs = (lastTime > 0) ? (time - lastTime) : (1000.0 / 60.0);
+	lastTime = time;
+	// Clamp to avoid huge jumps (e.g., when tab is backgrounded)
+	if (elapsedMs > 100.0) elapsedMs = 100.0;
+	float elapsedSeconds = (float)(elapsedMs / 1000.0);
+
 	if (frameMoveCallback) {
-		frameMoveCallback(DXUTGetD3DDevice(), time, time, null);
+		frameMoveCallback(DXUTGetD3DDevice(), time, elapsedSeconds, null);
 	}
 
 	if (frameRenderCallback) {
-		frameRenderCallback(DXUTGetD3DDevice(), time, time, null);
+		frameRenderCallback(DXUTGetD3DDevice(), time, elapsedSeconds, null);
 	}
 
 	// Return true to keep the loop running.

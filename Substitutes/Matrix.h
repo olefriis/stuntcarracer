@@ -24,7 +24,54 @@ typedef struct D3DXMATRIX : public D3DMATRIX
 {
 public:
     D3DXMATRIX() {};
+    D3DXMATRIX(const D3DMATRIX &other) { memcpy(this, &other, sizeof(D3DMATRIX)); }
+
+    D3DXMATRIX& operator=(const D3DMATRIX &other) { memcpy(this, &other, sizeof(D3DMATRIX)); return *this; }
+
+    D3DXMATRIX operator+(const D3DXMATRIX &other) const {
+        D3DXMATRIX result;
+        for (int i = 0; i < 16; i++)
+            result.glFloats[i] = glFloats[i] + other.glFloats[i];
+        return result;
+    }
+
+    D3DXMATRIX operator-(const D3DXMATRIX &other) const {
+        D3DXMATRIX result;
+        for (int i = 0; i < 16; i++)
+            result.glFloats[i] = glFloats[i] - other.glFloats[i];
+        return result;
+    }
+
+    friend D3DXMATRIX operator*(float scalar, const D3DXMATRIX &m) {
+        D3DXMATRIX result;
+        for (int i = 0; i < 16; i++)
+            result.glFloats[i] = scalar * m.glFloats[i];
+        return result;
+    }
 } D3DXMATRIX, *LPD3DXMATRIX;
+
+typedef struct D3DXQUATERNION {
+    FLOAT x, y, z, w;
+    D3DXQUATERNION() : x(0), y(0), z(0), w(1) {}
+    D3DXQUATERNION(FLOAT x, FLOAT y, FLOAT z, FLOAT w) : x(x), y(y), z(z), w(w) {}
+} D3DXQUATERNION;
+
+D3DXQUATERNION* D3DXQuaternionRotationMatrix(
+  D3DXQUATERNION *pOut,
+  const D3DXMATRIX *pM
+);
+
+D3DXQUATERNION* D3DXQuaternionSlerp(
+  D3DXQUATERNION *pOut,
+  const D3DXQUATERNION *pQ1,
+  const D3DXQUATERNION *pQ2,
+  FLOAT t
+);
+
+D3DXMATRIX* D3DXMatrixRotationQuaternion(
+  D3DXMATRIX *pOut,
+  const D3DXQUATERNION *pQ
+);
 
 D3DXMATRIX* D3DXMatrixPerspectiveFovLH(
   D3DXMATRIX *pOut,

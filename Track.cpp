@@ -2416,7 +2416,11 @@ void DrawTrack (IDirect3DDevice9 *pd3dDevice)
 		}
 	}
 
-	/* Finally draw the opponent's car shadow */
+	/* Shadow is now drawn separately via DrawShadow() */
+}
+
+void DrawShadow (IDirect3DDevice9 *pd3dDevice)
+{
 	if ((GameMode != TRACK_MENU) && (numShadowVertices > 0))
 	{
 		pd3dDevice->SetStreamSource( 0, pShadowVB, 0, sizeof(UTVERTEX) );
