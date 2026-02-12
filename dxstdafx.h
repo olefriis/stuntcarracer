@@ -197,6 +197,7 @@ typedef enum D3DTEXTUREOP {
 #include "Substitutes/Matrix.h"
 #include "Substitutes/Direct3DDevice.h"
 #include "Substitutes/Texture.h"
+#include "Substitutes/Text.h"
 
 class IDirect3D9 {
   public:
@@ -210,52 +211,12 @@ class IDirect3D9 {
   );
 };
 
-typedef struct POINT {
-  FLOAT x;
-  FLOAT y;
-} POINT;
-class ID3DXFont {
-  public:
-  virtual HRESULT OnResetDevice();
-  virtual HRESULT OnLostDevice();
-  virtual void Release();
-};
-typedef ID3DXFont *LPD3DXFONT;
-class ID3DXSprite {
-  public:
-  virtual void Release();
-};
-typedef ID3DXSprite *LPD3DXSPRITE;
 typedef struct tagRECT { 
     LONG    left;    // This is the upper-left corner x-coordinate.
     LONG    top;     // The upper-left corner y-coordinate.
     LONG    right;   // The lower-right corner x-coordinate.
     LONG    bottom;  // The lower-right corner y-coordinate.
 } RECT, *PRECT;
-typedef struct D3DXCOLOR
-{
-public:
-    D3DXCOLOR( FLOAT r, FLOAT g, FLOAT b, FLOAT a ) : r(r), g(g), b(b), a(a) {};
-    FLOAT r, g, b, a;
-} D3DXCOLOR, *LPD3DXCOLOR;
-
-class CDXUTTextHelper
-{
-public:
-    CDXUTTextHelper( ID3DXFont* pFont, ID3DXSprite* pSprite, int nLineHeight );
-
-    void SetInsertionPos( int x, int y );
-    void SetForegroundColor( D3DXCOLOR clr );
-
-    void Begin();
-    HRESULT DrawFormattedTextLine( const WCHAR* strMsg, ... );
-    HRESULT DrawTextLine( const WCHAR* strMsg );
-    void End();
-
-protected:
-    D3DXCOLOR m_clr;
-    POINT m_pt;
-};
 
 // Bogus types
 typedef unsigned int LPCGUID;
@@ -268,15 +229,7 @@ typedef struct D3DSURFACE_DESC {
 // DirectX functions
 #include "Substitutes/Sound.h"
 
-HRESULT D3DXCreateSprite(
-  LPDIRECT3DDEVICE9 pDevice,
-  LPD3DXSPRITE      *ppSprite
-);
-
 HWND DXUTGetHWND();
-
-LPCWSTR DXUTGetFrameStats( bool bIncludeFPS = false );
-LPCWSTR DXUTGetDeviceStats();
 
 #define D3DCOLOR_XRGB(r, g, b) r << 16 | g << 8 | b
 
@@ -317,21 +270,6 @@ HRESULT DXUTCreateDevice( UINT AdapterOrdinal = D3DADAPTER_DEFAULT, bool bWindow
                           void* pUserContext = NULL );
 
 #include "Substitutes/Window.h"
-
-HRESULT D3DXCreateFont(
-  LPDIRECT3DDEVICE9 pDevice,
-  INT               Height,
-  UINT              Width,
-  UINT              Weight,
-  UINT              MipLevels,
-  BOOL              Italic,
-  DWORD             CharSet,
-  DWORD             OutputPrecision,
-  DWORD             Quality,
-  DWORD             PitchAndFamily,
-  LPCTSTR           pFacename,
-  LPD3DXFONT        *ppFont
-);
 
 #ifndef SUCCEEDED
 #define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)

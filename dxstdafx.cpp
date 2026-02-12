@@ -4,54 +4,11 @@
 #include <fstream>
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
-
-/*
- * CDXUTTextHelper
- */
-CDXUTTextHelper::CDXUTTextHelper( ID3DXFont* pFont, ID3DXSprite* pSprite, int nLineHeight ) : m_clr(D3DXCOLOR( 1.0f, 1.0f, 1.0f, 1.0f )) {
-  Debug("CDXUTTextHelper constructor");
-}
-void CDXUTTextHelper::SetInsertionPos( int x, int y ) {
-  m_pt.x = x; m_pt.y = y;
-}
-void CDXUTTextHelper::SetForegroundColor( D3DXCOLOR clr ) {
-  m_clr = clr;
-}
-void CDXUTTextHelper::Begin() {
-  Debug("CDXUTTextHelper::Begin");
-}
-HRESULT CDXUTTextHelper::DrawFormattedTextLine( const WCHAR* strMsg, ... ) {
-  Debug("CDXUTTextHelper::DrawFormattedTextLine");
-  return S_OK;
-}
-HRESULT CDXUTTextHelper::DrawTextLine( const WCHAR* strMsg ) {
-  Debug("CDXUTTextHelper::DrawTextLine");
-  return S_OK;
-}
-void CDXUTTextHelper::End() {
-  Debug("CDXUTTextHelper::End");
-}
-
-HRESULT D3DXCreateSprite(
-  LPDIRECT3DDEVICE9 pDevice,
-  LPD3DXSPRITE      *ppSprite
-) {
-  Debug("D3DXCreateSprite");
-  return S_OK;
-}
+#include <stdarg.h>
+#include <wchar.h>
 
 HWND DXUTGetHWND() {
   Debug("DXUTGetHWND");
-  return NULL;
-}
-
-LPCWSTR DXUTGetDeviceStats() {
-  Debug("DXUTGetDeviceStats");
-  return NULL;
-}
-
-LPCWSTR DXUTGetFrameStats( bool bShowFPS ) {
-  Debug("DXUTGetFrameStats");
   return NULL;
 }
 
@@ -78,26 +35,6 @@ void DXUTDisplaySwitchingToREFWarning() {
 
 HRESULT DXUTReset3DEnvironment() {
   Debug("DXUTReset3DEnvironment");
-  return S_OK;
-}
-
-HRESULT D3DXCreateFont(
-  LPDIRECT3DDEVICE9 pDevice,
-  INT               Height,
-  UINT              Width,
-  UINT              Weight,
-  UINT              MipLevels,
-  BOOL              Italic,
-  DWORD             CharSet,
-  DWORD             OutputPrecision,
-  DWORD             Quality,
-  DWORD             PitchAndFamily,
-  LPCTSTR           pFacename,
-  LPD3DXFONT        *ppFont
-) {
-  Debug("D3DXCreateFont");
-  // TODO: Set ppFont to something useful
-  *ppFont = NULL;
   return S_OK;
 }
 
@@ -135,6 +72,9 @@ HRESULT DXUTCreateDevice( UINT AdapterOrdinal, bool bWindowed,
 }
 
 HRESULT StringCchPrintf( LPTSTR pszDest, size_t cchDest, LPCTSTR pszFormat, ... ) {
-  Debug("StringCchPrintf");
+  va_list args;
+  va_start(args, pszFormat);
+  vswprintf(pszDest, cchDest, pszFormat, args);
+  va_end(args);
   return S_OK;
 }
