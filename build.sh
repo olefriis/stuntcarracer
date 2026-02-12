@@ -17,6 +17,7 @@ emcc \
  wavefunctions.cpp \
  Backdrop.cpp \
  Substitutes/*.cpp \
+ -O2 \
  -ferror-limit=1000 \
  -s LLD_REPORT_UNDEFINED \
  -lopenal \
