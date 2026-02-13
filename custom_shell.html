@@ -5,23 +5,30 @@
 	<meta charset="utf-8">
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<!-- PWA / Add to Home Screen -->
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="apple-mobile-web-app-title" content="Stunt Car Racer">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="theme-color" content="#000000">
+	<link rel="manifest" href="manifest.json">
+	<link rel="apple-touch-icon" href="icon-192.png">
 	<title>Stunt Car Racer</title>
 	<style>
-		html {
-			height: 100%;
-		}
-
-		body {
+		html, body {
 			margin: 0;
-			height: 100%;
+			padding: 0;
+			width: 100vw;
+			height: 100vh;
 			overflow: hidden;
-			position: relative;
+			background: #000;
 		}
 
 		#canvas {
 			padding: 0;
-			height: 100%;
-			width: 100%;
+			width: 100vw;
+			height: 100vh;
+			display: block;
 		}
 
 		#textOverlay {
@@ -32,19 +39,95 @@
 			width: 100%;
 			height: 100%;
 		}
+
+		/* Landscape-only overlay: shown on mobile when in portrait */
+		#rotateOverlay {
+			display: none;
+			position: fixed;
+			left: 0; top: 0;
+			width: 100%; height: 100%;
+			background: #000;
+			color: #fff;
+			z-index: 10000;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			font-family: Arial, sans-serif;
+			text-align: center;
+		}
+		#rotateOverlay .icon {
+			font-size: 60px;
+			margin-bottom: 20px;
+			animation: rotateHint 2s ease-in-out infinite;
+		}
+		#rotateOverlay .msg {
+			font-size: 20px;
+		}
+		@keyframes rotateHint {
+			0%, 100% { transform: rotate(0deg); }
+			50% { transform: rotate(90deg); }
+		}
+
+		/* On touch devices in portrait mode, show the rotate overlay and hide the game */
+		@media (pointer: coarse) and (orientation: portrait) {
+			#rotateOverlay {
+				display: flex !important;
+			}
+			#canvas {
+				visibility: hidden;
+			}
+			#touchControls {
+				display: none !important;
+			}
+		}
 	</style>
 </head>
 
 <body>
+	<div id="rotateOverlay">
+		<div class="icon">📱</div>
+		<div class="msg">Please rotate your device to landscape mode</div>
+	</div>
+
 	<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
 
 	<script type='text/javascript'>
 		// Make the window code in Substitutes/Window.cpp grab the window size at start-up
 		window.production = true;
-		// ...and make it adjust when the window size changes...
-		window.onresize = function () {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
+
+		// On iOS, the canvas doesn't properly resize after a portrait→landscape rotation.
+		// If the page was loaded in portrait, reload once when we first enter landscape.
+		(function() {
+			var isLandscape = window.innerWidth > window.innerHeight;
+			if (isLandscape) {
+				// Started in landscape — mark it so we never reload
+				sessionStorage.setItem('scr_was_landscape', '1');
+			} else {
+				// Started in portrait — watch for rotation to landscape
+				function checkOrientation() {
+					if (window.innerWidth > window.innerHeight) {
+						if (!sessionStorage.getItem('scr_was_landscape')) {
+							sessionStorage.setItem('scr_was_landscape', '1');
+							window.location.reload();
+						}
+					}
+				}
+				window.addEventListener('resize', checkOrientation);
+				window.addEventListener('orientationchange', function() {
+					// Delay slightly — iOS reports stale dimensions during the event
+					setTimeout(checkOrientation, 200);
+				});
+			}
+		})();
+
+		// Try to lock orientation to landscape (works on Android, not on iOS Safari)
+		if (screen.orientation && screen.orientation.lock) {
+			screen.orientation.lock('landscape').catch(function() {});
+		}
+
+		// Register service worker for offline/PWA support
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.register('sw.js').catch(function() {});
 		}
 
 		var Module = {

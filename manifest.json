@@ -1,0 +1,22 @@
+{
+  "name": "Stunt Car Racer",
+  "short_name": "SCR",
+  "description": "Stunt Car Racer – a classic racing game in your browser",
+  "start_url": "source.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

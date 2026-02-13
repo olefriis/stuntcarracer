@@ -19,15 +19,7 @@ EM_JS(void, initTextOverlay, (), {
 
   // Wrap the WebGL canvas in a container so the overlay can be positioned on top
   var container = document.createElement('div');
-  container.style.position = 'relative';
-  container.style.display = 'inline-block';
-  container.style.width = glCanvas.style.width || (glCanvas.width + 'px');
-  container.style.height = glCanvas.style.height || (glCanvas.height + 'px');
-  // Copy any relevant styles
-  if (glCanvas.style.width === '100%') {
-    container.style.width = '100%';
-    container.style.height = '100%';
-  }
+  container.style.cssText = 'position:relative;width:100%;height:100%;';
   glCanvas.parentNode.insertBefore(container, glCanvas);
   container.appendChild(glCanvas);
 

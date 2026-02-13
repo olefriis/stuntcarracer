@@ -18,6 +18,7 @@ EM_JS(UINT, get_canvas_width, (), { return canvas.width; })
 EM_JS(UINT, get_canvas_height, (), { return canvas.height; })
 EM_JS(UINT, initial_canvas_width, (), { return window.production ? window.innerWidth : 320; })
 EM_JS(UINT, initial_canvas_height, (), { return window.production ? window.innerHeight : 240; })
+EM_JS(int, is_production, (), { return window.production ? 1 : 0; })
 
 // Thanks to https://codingtidbit.com/2019/08/24/bring-your-c-opengl-code-to-the-web/ for tips!
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
@@ -49,6 +50,19 @@ HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle ) {
 }
 
 void updateCanvasSize() {
+	// In production mode, sync the canvas to the browser viewport every frame.
+	// This handles window resizes on desktop. On iOS, a page reload on rotation
+	// (see custom_shell.html) ensures we always start with correct dimensions.
+	if (is_production()) {
+		UINT vpW = initial_canvas_width();
+		UINT vpH = initial_canvas_height();
+		int curW, curH;
+		emscripten_get_canvas_element_size("#canvas", &curW, &curH);
+		if ((int)vpW != curW || (int)vpH != curH) {
+			emscripten_set_canvas_element_size("#canvas", vpW, vpH);
+		}
+	}
+
 	UINT newWidth = get_canvas_width();
 	UINT newHeight = get_canvas_height();
 
