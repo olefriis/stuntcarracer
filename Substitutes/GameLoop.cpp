@@ -2,6 +2,7 @@
 #include <emscripten/html5.h>
 
 #include "../dxstdafx.h"
+#include "TouchControls.h"
 
 static LPDXUTCALLBACKDEVICERESET deviceResetCallback;
 static LPDXUTCALLBACKFRAMEMOVE frameMoveCallback;
@@ -78,6 +79,8 @@ EM_BOOL one_iter(double time, void* userData) {
 		frameRenderCallback(DXUTGetD3DDevice(), time, elapsedSeconds, null);
 	}
 
+	updateTouchControls();
+
 	// Return true to keep the loop running.
 	return EM_TRUE;
 	//puts("Iteration done");
@@ -151,6 +154,8 @@ int main() {
   	if (emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, key_callback) != EMSCRIPTEN_RESULT_SUCCESS) {
 		Error("emscripten_set_keyup_callback failed");
 	}
+
+	initTouchControls();
 
 	if (deviceResetCallback) {
 		Debug("Resetting device");

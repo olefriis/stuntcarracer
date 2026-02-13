@@ -20,6 +20,8 @@ emcc \
  -O2 \
  -ferror-limit=1000 \
  -s LLD_REPORT_UNDEFINED \
+ -s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode"]' \
+ -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
  -lopenal \
  --use-preload-plugins \
  -s USE_SDL_IMAGE=2 \

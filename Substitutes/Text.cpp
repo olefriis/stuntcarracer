@@ -70,6 +70,8 @@ EM_JS(void, clearTextOverlay, (), {
 // text: the string to draw (passed as a UTF-8 C string)
 EM_JS(void, drawTextOnOverlay, (int x, int y, float r, float g, float b, float a, int fontHeight, const char* text), {
   if (!window._textOverlayReady) return;
+  // On touch devices, the touch controls replace the text overlay
+  if (window._isTouchDevice) return;
   var ctx = window._textOverlayCtx;
   var str = UTF8ToString(text);
   ctx.font = 'bold ' + fontHeight + 'px Arial, sans-serif';
