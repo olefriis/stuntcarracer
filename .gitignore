@@ -9,3 +9,4 @@ SCRLog.txt
 
 a.out.*
 source.*
+dist/

@@ -2,8 +2,12 @@
 
 set -ex
 
-./build.sh $1
+if [ "$1" == "production" ]; then
+	make production
+else
+	make
+fi
 
-echo 'Build succeeded. Now serving the result on http://localhost:8000/source.html'
+echo 'Build succeeded. Now serving on http://localhost:8000/source.html'
 
-python3 -m http.server
+cd dist && python3 -m http.server

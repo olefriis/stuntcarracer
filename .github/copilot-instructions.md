@@ -22,13 +22,13 @@ To build the project, you will need to have Emscripten installed and set up on y
 machine. You can follow the instructions on the Emscripten website to do this. The
 project builds with Emscripten 5.0.
 
-Then run the following command:
+Then run:
 
 ```bash
-./build.sh
+make
 ```
 
-This will create a `source.html`, `source.js`, and `source.wasm` file in the root of the project. You can serve these files using an HTTP server, or you can just run
+This will create a `dist/` directory with everything required to run the game.You can serve the `dist/` folder with any HTTP server, or just run:
 
 ```bash
 ./build-and-serve.sh
@@ -40,3 +40,6 @@ the actual game area is pretty small. To get the full game experience, instead r
 ```bash
 ./build-and-serve.sh production
 ```
+
+The production build uses `custom_shell.html` for a fullscreen layout and also
+copies PWA assets (manifest, service worker, icons) into `dist/`.
