@@ -43,3 +43,21 @@ the actual game area is pretty small. To get the full game experience, instead r
 
 The production build uses `custom_shell.html` for a fullscreen layout and also
 copies PWA assets (manifest, service worker, icons) into `dist/`.
+
+# Cache Busting
+
+The production build includes a service worker (`sw.js`) that caches assets for
+offline/PWA use. When testing changes on a device (especially iOS simulators),
+the old cached files can prevent new code from loading.
+
+To force a fresh load, bump the cache version in `sw.js`:
+
+```js
+var CACHE_NAME = 'scr-v4'; // increment the number
+```
+
+Then rebuild with `make production`. The new service worker will activate via
+`skipWaiting()` and purge the old cache.
+
+On iOS simulators you may also need to clear website data:
+**Settings → Safari → Advanced → Website Data → Remove All Website Data**.

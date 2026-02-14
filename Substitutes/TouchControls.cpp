@@ -4,12 +4,15 @@
 
 #include "../dxstdafx.h"
 #include "../StuntCarRacer.h"
+#include "../Track.h"
 #include "TouchControls.h"
 #include <emscripten.h>
+#include <wchar.h>
 
 extern GameModeType GameMode;
 extern UINT keyPress;
 extern DWORD lastInput;
+extern long TrackID;
 
 // Expose current game mode to JavaScript
 EM_JS(int, js_getGameMode, (), {
@@ -63,7 +66,8 @@ EM_JS(void, js_initTouchControls, (), {
     createButton('tc-prev', '◀', 'left:2vw;bottom:6vh;width:15vw;height:15vw;font-size:7vw;max-width:80px;max-height:80px;');
     createButton('tc-next', '▶', 'left:19vw;bottom:6vh;width:15vw;height:15vw;font-size:7vw;max-width:80px;max-height:80px;');
     createButton('tc-select', 'SELECT', 'right:2vw;bottom:6vh;width:25vw;height:15vw;font-size:3.5vw;max-width:140px;max-height:80px;');
-
+    // Track name label (centred between arrows and select button)
+    createButton('tc-trackname', '', 'left:36vw;right:29vw;width:auto;bottom:6vh;height:15vw;max-height:80px;font-size:4vw;pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
     // --- Track Preview buttons ---
     createButton('tc-back', 'BACK', 'left:2vw;bottom:6vh;width:22vw;height:12vw;font-size:4.5vw;max-width:120px;max-height:70px;');
     createButton('tc-start', 'START', 'right:2vw;bottom:6vh;width:22vw;height:12vw;font-size:4.5vw;max-width:120px;max-height:70px;');
@@ -184,10 +188,11 @@ EM_JS(void, js_initTouchControls, (), {
 });
 
 // Update which buttons are visible based on game mode
-EM_JS(void, js_updateTouchControls, (int gameMode), {
+EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr), {
     if (!window._isTouchDevice || !window._touchControlsReady) return;
-    if (gameMode === window._lastTouchGameMode) return;
-    window._lastTouchGameMode = gameMode;
+
+    if (gameMode !== window._lastTouchGameMode) {
+        window._lastTouchGameMode = gameMode;
 
     // Game mode constants (must match GameModeType enum)
     var TRACK_MENU = 0;
@@ -196,7 +201,7 @@ EM_JS(void, js_updateTouchControls, (int gameMode), {
     var GAME_OVER = 3;
 
     // All button ids grouped by mode
-    var menuBtns = ['tc-prev', 'tc-next', 'tc-select'];
+    var menuBtns = ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'];
     var previewBtns = ['tc-back', 'tc-start'];
     var gameBtns = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost', 'tc-menu'];
     var gameOverBtns = ['tc-gameover'];
@@ -219,6 +224,16 @@ EM_JS(void, js_updateTouchControls, (int gameMode), {
     for (var i = 0; i < show.length; i++) {
         var el = document.getElementById(show[i]);
         if (el) el.style.display = 'flex';
+    }
+
+    } // end if (gameMode !== _lastTouchGameMode)
+
+    // Update the track name label every frame when on the track menu
+    if (gameMode === 0) {
+        var label = document.getElementById('tc-trackname');
+        if (label) {
+            label.textContent = trackNamePtr ? UTF8ToString(trackNamePtr) : '';
+        }
     }
 });
 
@@ -243,5 +258,18 @@ void initTouchControls() {
 }
 
 void updateTouchControls() {
-    js_updateTouchControls((int)GameMode);
+    // Get the current track name as UTF-8 to pass to JS
+    static char trackNameBuf[128];
+    const char* trackName = NULL;
+    if (GameMode == TRACK_MENU) {
+        if (TrackID == NO_TRACK) {
+            trackName = "None";
+        } else {
+            WCHAR* name = GetTrackName(TrackID);
+            wcstombs(trackNameBuf, name, sizeof(trackNameBuf) - 1);
+            trackNameBuf[sizeof(trackNameBuf) - 1] = '\0';
+            trackName = trackNameBuf;
+        }
+    }
+    js_updateTouchControls((int)GameMode, trackName);
 }
