@@ -5,16 +5,22 @@ Amiga game Stunt Car Racer and made it work on Windows machines with DirectX. Th
 fork intends to make it run in a browser using the Emscripten compiler.
 
 The changes in this fork revolve around creating a DirectX wrapper that mimics the
-DirectX API but translates calls to WebGL (and SDL for sound). We want to change the
-original code as little as possible, so we will implement the DirectX functions in a
-way that they can be called from the original game code without modification.
+DirectX API but translates calls to OpenGL. Emscripten then translages OpenGL to
+WebGL. In short, this project uses:
+* OpenGL for graphics.
+* OpenAL for audio.
+* SDL for input handling.
+
+We want to change the original code as little as possible, so we are implementing
+the DirectX functions in a way that they can be called from the original game code.
 
 The DirectX (and other) wrappers are located in the `Substitutes` folder.
 
 # Building
 
 To build the project, you will need to have Emscripten installed and set up on your
-machine. You can follow the instructions on the Emscripten website to do this.
+machine. You can follow the instructions on the Emscripten website to do this. The
+project builds with Emscripten 5.0.
 
 Then run the following command:
 
