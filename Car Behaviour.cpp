@@ -517,7 +517,24 @@ void CarBehaviour (DWORD input,
 	    (bNewGame) ||
 		(ReplayRequested))
 		{
+		// preserve damage state when car is put back on track (original Amiga behaviour)
+		long save_front_left_damage = front_left_damage;
+		long save_front_right_damage = front_right_damage;
+		long save_rear_damage = rear_damage;
+		long save_new_damage = new_damage;
+		long save_damaged = damaged;
+
 		ResetPlayer();
+
+		if (off_track_count > OFF_TRACK_LIMIT)
+			{
+			// restore damage - falling off track should not reset damage
+			front_left_damage = save_front_left_damage;
+			front_right_damage = save_front_right_damage;
+			rear_damage = save_rear_damage;
+			new_damage = save_new_damage;
+			damaged = save_damaged;
+			}
 
 		if (bNewGame || ReplayRequested)
 			{
