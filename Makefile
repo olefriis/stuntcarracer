@@ -1,9 +1,9 @@
 # Stunt Car Racer — Emscripten Build
 #
 # Usage:
-#   make            — debug build (small canvas, log area)
-#   make production — production build (fullscreen, custom shell, PWA assets)
-#   make clean      — remove build output
+#   make       — production build (fullscreen, custom shell, PWA assets)
+#   make debug — debug build (small canvas, log area)
+#   make clean — remove build output
 #
 # Requires Emscripten 5.0+ (emcc on PATH).
 
@@ -41,20 +41,20 @@ PWA_ASSETS = manifest.json sw.js icon-192.png icon-512.png
 
 # ─── Targets ────────────────────────────────────────────────
 
-.PHONY: all production clean
+.PHONY: all debug clean
 
-all: $(DIST)/source.html
+all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS))
 
-production: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS))
+debug: $(DIST)/source.html
 
 $(DIST)/source.html: $(SOURCES) custom_shell.html | $(DIST)
 	@echo "Building…"
-	@if [ "$(MAKECMDGOALS)" = "production" ]; then \
-		echo "  (production build — using custom shell)"; \
-		emcc $(SOURCES) $(EMCC_FLAGS) --shell-file custom_shell.html -o $(DIST)/source.html; \
-	else \
+	@if [ "$(MAKECMDGOALS)" = "debug" ]; then \
 		echo "  (debug build)"; \
 		emcc $(SOURCES) $(EMCC_FLAGS) -o $(DIST)/source.html; \
+	else \
+		echo "  (production build — using custom shell)"; \
+		emcc $(SOURCES) $(EMCC_FLAGS) --shell-file custom_shell.html -o $(DIST)/source.html; \
 	fi
 
 $(DIST)/%.json: %.json | $(DIST)

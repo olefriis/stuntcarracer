@@ -28,21 +28,23 @@ Then run:
 make
 ```
 
-This will create a `dist/` directory with everything required to run the game.You can serve the `dist/` folder with any HTTP server, or just run:
+This will create a `dist/` directory with everything required to run the game.
+The default build uses `custom_shell.html` for a fullscreen layout and also
+copies PWA assets (manifest, service worker, icons) into `dist/`.
+
+You can serve the `dist/` folder with any HTTP server, or just run:
 
 ```bash
 ./build-and-serve.sh
 ```
 
-...and go to http://localhost:8000/source.html. You'll see a debug log area, and
-the actual game area is pretty small. To get the full game experience, instead run:
+...and go to http://localhost:8000/source.html.
+
+For a debug build with the standard Emscripten shell (small canvas, log area), run:
 
 ```bash
-./build-and-serve.sh production
+./build-and-serve.sh debug
 ```
-
-The production build uses `custom_shell.html` for a fullscreen layout and also
-copies PWA assets (manifest, service worker, icons) into `dist/`.
 
 # Cache Busting
 
@@ -56,7 +58,7 @@ To force a fresh load, bump the cache version in `sw.js`:
 var CACHE_NAME = 'scr-v4'; // increment the number
 ```
 
-Then rebuild with `make production`. The new service worker will activate via
+Then rebuild with `make`. The new service worker will activate via
 `skipWaiting()` and purge the old cache.
 
 On iOS simulators you may also need to clear website data:

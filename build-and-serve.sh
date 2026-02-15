@@ -2,8 +2,8 @@
 
 set -ex
 
-if [ "$1" == "production" ]; then
-	make production
+if [ "$1" == "debug" ]; then
+	make debug
 else
 	make
 fi
