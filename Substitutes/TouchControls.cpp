@@ -17,6 +17,8 @@ extern UINT keyPress;
 extern DWORD lastInput;
 extern long TrackID;
 extern bool raceWon;
+extern long boostReserve, StandardBoost;
+extern long new_damage;
 
 // Expose current game mode to JavaScript
 EM_JS(int, js_getGameMode, (), {
@@ -90,13 +92,13 @@ EM_JS(void, js_initTouchControls, (), {
 
     // --- In-Game controls ---
     // Left side: steering
-    createButton('tc-left', '\u25C0\uFE0E', 'left:2vw;bottom:6vh;width:13vw;height:13vw;font-size:6vw;max-width:75px;max-height:75px;');
-    createButton('tc-right', '\u25B6\uFE0E', 'left:17vw;bottom:6vh;width:13vw;height:13vw;font-size:6vw;max-width:75px;max-height:75px;');
-    // Right side: accel on top, brake below (gap accounts for 13vw height in landscape)
-    createButton('tc-accel', '\u25B2\uFE0E', 'right:2vw;bottom:36vh;width:13vw;height:13vw;font-size:6vw;max-width:75px;max-height:75px;');
-    createButton('tc-brake', '\u25BC\uFE0E', 'right:2vw;bottom:6vh;width:13vw;height:13vw;font-size:6vw;max-width:75px;max-height:75px;');
+    createButton('tc-left', '\u25C0\uFE0E', 'left:2vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
+    createButton('tc-right', '\u25B6\uFE0E', 'left:15vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
+    // Right side: accel on top, brake below
+    createButton('tc-accel', '\u25B2\uFE0E', 'right:2vw;bottom:30vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
+    createButton('tc-brake', '\u25BC\uFE0E', 'right:2vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
     // Centre: BOOST
-    createButton('tc-boost', 'BOOST', 'left:50%;bottom:6vh;width:22vw;height:13vw;font-size:4vw;max-width:120px;max-height:75px;transform:translateX(-50%);');
+    createButton('tc-boost', 'BOOST', 'left:50%;bottom:6vh;width:20vw;height:11vw;font-size:3.5vw;max-width:110px;max-height:65px;transform:translateX(-50%);');
     // Menu close button
     createButton('tc-menu', '\u2715', 'right:2vw;top:2vh;width:10vw;height:10vw;font-size:5vw;max-width:55px;max-height:55px;');
 
@@ -104,7 +106,30 @@ EM_JS(void, js_initTouchControls, (), {
     // "GAME OVER" label (non-interactive, centred)
     createButton('tc-gameover-label', 'GAME OVER', 'left:50%;top:40%;width:50vw;height:auto;font-size:7vw;max-width:300px;pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);transform:translate(-50%,-50%);');
     // MENU button (same position as BOOST button)
-    createButton('tc-gameover', 'MENU', 'left:50%;bottom:6vh;width:22vw;height:13vw;font-size:4vw;max-width:120px;max-height:75px;transform:translateX(-50%);');
+    createButton('tc-gameover', 'MENU', 'left:50%;bottom:6vh;width:18vw;height:11vw;font-size:3.5vw;max-width:100px;max-height:65px;transform:translateX(-50%);');
+
+    // --- In-Game HUD: boost and damage bars at top of screen ---
+    function createHudBar(id, icon, color) {
+        var row = document.createElement('div');
+        row.id = id;
+        row.style.cssText = 'position:absolute;display:none;align-items:center;pointer-events:none;height:2.5vh;min-height:14px;';
+        var iconEl = document.createElement('span');
+        iconEl.textContent = icon;
+        iconEl.style.cssText = 'font-size:6vh;margin-right:1vw;line-height:1;';
+        var track = document.createElement('div');
+        track.style.cssText = 'flex:1;height:100%;background:rgba(0,0,0,0.4);border-radius:4px;overflow:hidden;';
+        var fill = document.createElement('div');
+        fill.id = id + '-fill';
+        fill.style.cssText = 'height:100%;width:0%;background:' + color + ';border-radius:4px;transition:width 0.15s;';
+        track.appendChild(fill);
+        row.appendChild(iconEl);
+        row.appendChild(track);
+        container.appendChild(row);
+    }
+    createHudBar('tc-hud-boost', '\uD83D\uDD25', '#ff9900');  // 🔥 fire emoji
+    document.getElementById('tc-hud-boost').style.cssText += 'left:2vw;right:50%;top:2vh;padding-right:1vw;';
+    createHudBar('tc-hud-damage', '\u26A0\uFE0F', '#ff3333'); // ⚠️ warning emoji
+    document.getElementById('tc-hud-damage').style.cssText += 'left:50%;right:14vw;top:2vh;padding-left:1vw;';
 
     // Track the current track index for cycling through tracks in menu
     window._touchTrackIndex = 0;
@@ -224,7 +249,7 @@ EM_JS(void, js_initTouchControls, (), {
 });
 
 // Update which buttons are visible based on game mode
-EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int raceWonFlag), {
+EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int raceWonFlag, int boostVal, int boostMax, int damageVal), {
     if (!window._isTouchDevice || !window._touchControlsReady) return;
 
     if (gameMode !== window._lastTouchGameMode) {
@@ -239,7 +264,7 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
     // All button ids grouped by mode
     var menuBtns = ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'];
     var previewBtns = ['tc-back', 'tc-start'];
-    var gameBtns = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost', 'tc-menu'];
+    var gameBtns = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost', 'tc-menu', 'tc-hud-boost', 'tc-hud-damage'];
     var gameOverBtns = ['tc-gameover-label', 'tc-gameover'];
 
     var allBtns = menuBtns.concat(previewBtns, gameBtns, gameOverBtns);
@@ -275,6 +300,20 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
         var label = document.getElementById('tc-trackname');
         if (label) {
             label.textContent = trackNamePtr ? UTF8ToString(trackNamePtr) : '';
+        }
+    }
+
+    // Update HUD bars every frame during gameplay
+    if (gameMode === 2 || gameMode === 3) {
+        var boostFill = document.getElementById('tc-hud-boost-fill');
+        if (boostFill) {
+            var pct = boostMax > 0 ? Math.round(100 * boostVal / boostMax) : 0;
+            boostFill.style.width = pct + '%';
+        }
+        var dmgFill = document.getElementById('tc-hud-damage-fill');
+        if (dmgFill) {
+            var pct = Math.min(100, Math.round(100 * damageVal / 255));
+            dmgFill.style.width = pct + '%';
         }
     }
 });
@@ -313,5 +352,6 @@ void updateTouchControls() {
             trackName = trackNameBuf;
         }
     }
-    js_updateTouchControls((int)GameMode, trackName, raceWon ? 1 : 0);
+    js_updateTouchControls((int)GameMode, trackName, raceWon ? 1 : 0,
+                            (int)boostReserve, (int)StandardBoost, (int)new_damage);
 }

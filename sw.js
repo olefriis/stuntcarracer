@@ -1,7 +1,7 @@
 // Service worker for Stunt Car Racer PWA
 // Caches game files for offline play and home-screen launch
 
-var CACHE_NAME = 'scr-v11';
+var CACHE_NAME = 'scr-v14';
 var ASSETS = [
   'source.html',
   'source.js',
