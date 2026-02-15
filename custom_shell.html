@@ -22,6 +22,9 @@
 			height: 100vh;
 			overflow: hidden;
 			background: #000;
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
 		}
 
 		#canvas {
@@ -68,6 +71,25 @@
 			50% { transform: rotate(90deg); }
 		}
 
+		/* PWA install button */
+		#installBtn {
+			display: none;
+			position: fixed;
+			bottom: 2vh;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 9999;
+			padding: 10px 28px;
+			background: rgba(255,255,255,0.9);
+			color: #000;
+			border: none;
+			border-radius: 8px;
+			font-size: 16px;
+			font-family: Arial, sans-serif;
+			cursor: pointer;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+		}
+
 		/* On touch devices in portrait mode, show the rotate overlay and hide the game */
 		@media (pointer: coarse) and (orientation: portrait) {
 			#rotateOverlay {
@@ -89,6 +111,7 @@
 		<div class="msg">Please rotate your device to landscape mode</div>
 	</div>
 
+	<button id="installBtn">Install App</button>
 	<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
 
 	<script type='text/javascript'>
@@ -129,6 +152,27 @@
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('sw.js').catch(function() {});
 		}
+
+		// PWA install prompt — capture the event and show an install button
+		var deferredInstallPrompt = null;
+		window.addEventListener('beforeinstallprompt', function(e) {
+			e.preventDefault();
+			deferredInstallPrompt = e;
+			document.getElementById('installBtn').style.display = 'block';
+		});
+		document.getElementById('installBtn').addEventListener('click', function() {
+			if (!deferredInstallPrompt) return;
+			deferredInstallPrompt.prompt();
+			deferredInstallPrompt.userChoice.then(function() {
+				deferredInstallPrompt = null;
+				document.getElementById('installBtn').style.display = 'none';
+			});
+		});
+		// Hide button if app is installed
+		window.addEventListener('appinstalled', function() {
+			document.getElementById('installBtn').style.display = 'none';
+			deferredInstallPrompt = null;
+		});
 
 		var Module = {
 			preRun: [],

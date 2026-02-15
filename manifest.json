@@ -1,7 +1,7 @@
 {
   "name": "Stunt Car Racer",
-  "short_name": "SCR",
-  "description": "Stunt Car Racer – a classic racing game in your browser",
+  "short_name": "Stunt Car Racer",
+  "description": "A classic racing game in your browser",
   "start_url": "source.html",
   "display": "fullscreen",
   "orientation": "landscape",
