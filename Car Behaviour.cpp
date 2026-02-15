@@ -786,6 +786,12 @@ static void CarControl (DWORD input)
 		accelerate = FALSE;
 		}
 
+	// Touch controls: accelerate without boost
+	if ((input & KEY_P1_ACCEL_ONLY) && !(input & KEY_P1_HASH))
+		{
+		accelerate = TRUE;
+		}
+
 	// if none of the resulting keys are pressed then read joystick
 
 	left_right_value = 0;

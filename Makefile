@@ -23,7 +23,7 @@ EMCC_FLAGS = \
 	-O2 \
 	-ferror-limit=1000 \
 	-s LLD_REPORT_UNDEFINED \
-	-s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode"]' \
+	-s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode","_touchSetDriveInput"]' \
 	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
 	-lopenal \
 	--use-preload-plugins \

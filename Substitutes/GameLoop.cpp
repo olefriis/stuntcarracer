@@ -92,25 +92,12 @@ EM_BOOL one_iter(double time, void* userData) {
 INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int );
 
 UINT mapKeyCodeToDirectXChar(int keyCode) {
-	// Map arrow keys to S (left), D (right), Enter (up)
-	if (keyCode == 37) { // Left
-		return 'S';
-	}
-	if (keyCode == 39) { // Right
-		return 'D';
-	}
-	if (keyCode == 38) { // Up
-		return 0x0D;
-	}
-
-	// Maybe a little weird: Map space to "hash key", which gives a backwards boost when used together with the down arrow.
-	// At the same time, map arrow down to space. Somehow, this makes sense regarding the steering.
-	if (keyCode == 40) { // Down
-		return ' ';
-	}
-	if (keyCode == 32) { // Space
-		return 0xDE; // "Hash key"
-	}
+	// Arrow keys for steering and accel/brake
+	if (keyCode == 37) return 'S';       // Left arrow = steer left
+	if (keyCode == 39) return 'D';       // Right arrow = steer right
+	if (keyCode == 38) return 0x26;      // Up arrow = VK_UP = accelerate
+	if (keyCode == 40) return 0x28;      // Down arrow = VK_DOWN = brake
+	if (keyCode == 16) return 0x10;      // Shift = VK_SHIFT = boost modifier
 
 	// TODO: Map something to F1-F10 (VK_F1-VK_F10)
 

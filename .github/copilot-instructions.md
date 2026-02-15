@@ -55,7 +55,7 @@ the old cached files can prevent new code from loading.
 To force a fresh load, bump the cache version in `sw.js`:
 
 ```js
-var CACHE_NAME = 'scr-v4'; // increment the number
+var CACHE_NAME = 'scr-v6'; // increment the number
 ```
 
 Then rebuild with `make`. The new service worker will activate via

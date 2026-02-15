@@ -1272,7 +1272,7 @@ static void HandleTrackPreview( CDXUTTextHelper &txtHelper )
 
 	txtHelper.SetInsertionPos( 2, pd3dsdBackBuffer->Height-15*6 );
 	txtHelper.DrawTextLine( L"Keyboard controls during game :-" );
-	txtHelper.DrawTextLine( L"  S = Steer left, D = Steer right, Enter = Accelerate, Space = Brake" );
+	txtHelper.DrawTextLine( L"  Arrow keys = Steer / Accelerate / Brake, Shift = Boost" );
 	txtHelper.DrawTextLine( L"  R = Point car in opposite direction, P = Pause, O = Unpause" );
 	txtHelper.DrawTextLine( L"  M = Back to track menu, Escape = Quit" );
 
@@ -1631,6 +1631,8 @@ LRESULT CALLBACK MsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 //--------------------------------------------------------------------------------------
 void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUserContext )
 {
+    static bool shiftHeld = false;
+
     if( bKeyDown )
     {
 		keyPress = nChar;
@@ -1709,6 +1711,32 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
             lastInput |= KEY_P1_RIGHT;
             break;
 
+        case VK_UP:	// Up arrow = accelerate (boost-aware via Shift)
+            if (shiftHeld)
+                lastInput |= KEY_P1_ACCEL_BOOST;
+            else
+                lastInput |= KEY_P1_ACCEL_ONLY;
+            break;
+
+        case VK_DOWN:	// Down arrow = brake (boost-aware via Shift)
+            if (shiftHeld)
+                lastInput |= KEY_P1_BRAKE_BOOST;
+            else
+                lastInput |= KEY_P1_HASH;
+            break;
+
+        case VK_SHIFT:	// Shift = boost modifier — update accel/brake flags
+            shiftHeld = true;
+            if (lastInput & KEY_P1_ACCEL_ONLY) {
+                lastInput &= ~KEY_P1_ACCEL_ONLY;
+                lastInput |= KEY_P1_ACCEL_BOOST;
+            }
+            if (lastInput & KEY_P1_HASH) {
+                lastInput &= ~KEY_P1_HASH;
+                lastInput |= KEY_P1_BRAKE_BOOST;
+            }
+            break;
+
         case 0xDE:	// couldn't find VK_ definition for HASH key
             lastInput |= KEY_P1_HASH;
             break;
@@ -1746,6 +1774,26 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
 
         case 'D':
             lastInput &= ~KEY_P1_RIGHT;
+            break;
+
+        case VK_UP:	// Up arrow released — clear both accel flags
+            lastInput &= ~(KEY_P1_ACCEL_BOOST | KEY_P1_ACCEL_ONLY);
+            break;
+
+        case VK_DOWN:	// Down arrow released — clear both brake flags
+            lastInput &= ~(KEY_P1_BRAKE_BOOST | KEY_P1_HASH);
+            break;
+
+        case VK_SHIFT:	// Shift released — downgrade boost to non-boost
+            shiftHeld = false;
+            if (lastInput & KEY_P1_ACCEL_BOOST) {
+                lastInput &= ~KEY_P1_ACCEL_BOOST;
+                lastInput |= KEY_P1_ACCEL_ONLY;
+            }
+            if (lastInput & KEY_P1_BRAKE_BOOST) {
+                lastInput &= ~KEY_P1_BRAKE_BOOST;
+                lastInput |= KEY_P1_HASH;
+            }
             break;
 
         case 0xDE:	// couldn't find VK_ definition for HASH key

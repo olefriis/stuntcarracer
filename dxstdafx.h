@@ -127,6 +127,10 @@ typedef struct tagPALETTEENTRY {
 // Space and Return keys
 #define VK_SPACE 0x20
 #define VK_RETURN 0x0D
+// Arrow keys and modifiers
+#define VK_SHIFT 0x10
+#define VK_UP 0x26
+#define VK_DOWN 0x28
 
 typedef enum D3DDEVTYPE { 
   D3DDEVTYPE_HAL          = 1,

@@ -15,6 +15,7 @@
 #define KEY_P1_HASH		0x00000004l
 #define KEY_P1_BRAKE_BOOST	0x00000008l
 #define KEY_P1_ACCEL_BOOST	0x00000010l
+#define KEY_P1_ACCEL_ONLY	0x00000020l	// touch: accelerate without boost
 
 #define	AMIGA_PAL_HZ	(3546895)
 
