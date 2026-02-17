@@ -58,6 +58,7 @@ typedef enum
 /*	Global data */
 /*	=========== */
 long opponentsID = NO_OPPONENT;	// 0 to 10
+long requestedOpponentID = NO_OPPONENT;	// set by JS to request a specific opponent
 long opponents_current_piece = 0;	// use as opponents_road_section
 
 bool player_close_to_opponent = FALSE;
@@ -282,8 +283,15 @@ static void OpponentPushPlayer( void );
 
 static void ResetOpponent (void)
 	{
-	opponentsID = rand() % NUM_OPPONENTS;
-//	opponentsID = 9;	// Jumping Jack
+	if (requestedOpponentID != NO_OPPONENT)
+		{
+		opponentsID = requestedOpponentID;
+		requestedOpponentID = NO_OPPONENT;
+		}
+	else
+		{
+		opponentsID = rand() % NUM_OPPONENTS;
+		}
 
 	opp_old_rear_left_difference = 0;
 	opp_old_rear_right_difference = 0;

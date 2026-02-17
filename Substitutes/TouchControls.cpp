@@ -1,7 +1,7 @@
-// Touch controls overlay for mobile devices.
-// Creates HTML button elements over the WebGL canvas.
-// Menu/preview buttons inject keyboard events via KeyboardProc.
-// In-game driving buttons directly manipulate the lastInput bitmask
+// UI overlay for all devices.
+// Creates HTML elements over the WebGL canvas.
+// Menu/preview buttons call exported C++ API functions directly.
+// In-game driving buttons (mobile only) manipulate the lastInput bitmask
 // so that BOOST works as a modifier (like the original Amiga fire button).
 
 #include "../dxstdafx.h"
@@ -16,16 +16,13 @@ extern GameModeType GameMode;
 extern UINT keyPress;
 extern DWORD lastInput;
 extern long TrackID;
-extern bool raceWon;
+extern bool raceFinished, raceWon;
 extern long boostReserve, StandardBoost;
 extern long new_damage;
+extern long opponentsID;
+extern long lapNumber[];
 
 // Expose current game mode to JavaScript
-EM_JS(int, js_getGameMode, (), {
-    return Module._getTouchGameMode();
-});
-
-// C functions callable from JS
 extern "C" {
     EMSCRIPTEN_KEEPALIVE
     int getTouchGameMode() {
@@ -37,7 +34,6 @@ extern "C" {
     // replacing only the drive-related bits (steering + accel/brake/boost).
     EMSCRIPTEN_KEEPALIVE
     void touchSetDriveInput(int flags) {
-        // Mask covers all drive bits: LEFT|RIGHT|HASH|BRAKE_BOOST|ACCEL_BOOST|ACCEL_ONLY
         const DWORD DRIVE_MASK = KEY_P1_LEFT | KEY_P1_RIGHT | KEY_P1_HASH
                                | KEY_P1_BRAKE_BOOST | KEY_P1_ACCEL_BOOST
                                | KEY_P1_ACCEL_ONLY;
@@ -45,77 +41,98 @@ extern "C" {
     }
 }
 
-// Create and manage touch control HTML elements
+// ────────────────────────────────────────────────────────────────
+// Create and manage overlay HTML elements
+// ────────────────────────────────────────────────────────────────
 EM_JS(void, js_initTouchControls, (), {
     if (window._touchControlsReady) return;
 
-    // Only show on touch devices
-    var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-    window._isTouchDevice = isTouchDevice;
-    if (!isTouchDevice) {
-        window._touchControlsReady = true;
-        return;
-    }
+    var isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    window._isTouchDevice = isMobile;
 
-    // Create the touch controls container
+    // ── Fade overlay ──
+    var fade = document.createElement('div');
+    fade.id = 'fadeOverlay';
+    fade.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;' +
+        'opacity:0;pointer-events:none;z-index:200;transition:opacity 0.35s ease;';
+    document.body.appendChild(fade);
+
+    // ── Container ──
     var container = document.createElement('div');
     container.id = 'touchControls';
-    container.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:100;user-select:none;-webkit-user-select:none;';
+    container.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;' +
+        'pointer-events:none;z-index:100;user-select:none;-webkit-user-select:none;';
     document.body.appendChild(container);
 
-    // Helper to create a touch button
-    function createButton(id, text, cssText) {
-        var btn = document.createElement('div');
-        btn.id = id;
-        btn.textContent = text;
-        btn.style.cssText = 'position:absolute;pointer-events:auto;display:none;' +
-            'background:rgba(255,255,255,0.25);color:#fff;border:2px solid rgba(255,255,255,0.5);' +
+    // ── Helper: create a styled element ──
+    function createEl(id, text, cssText) {
+        var el = document.createElement('div');
+        el.id = id;
+        if (text) el.textContent = text;
+        el.style.cssText = 'position:absolute;pointer-events:auto;display:none;' +
+            'background:rgba(255,255,255,0.18);color:#fff;border:2px solid rgba(255,255,255,0.4);' +
             'border-radius:12px;font-family:Arial,sans-serif;font-weight:bold;' +
             'display:flex;align-items:center;justify-content:center;' +
             'touch-action:none;user-select:none;-webkit-user-select:none;' +
-            'box-sizing:border-box;text-align:center;overflow:hidden;white-space:nowrap;' + cssText;
-        // Use flexbox centering
-        btn.style.display = 'none';
-        container.appendChild(btn);
-        return btn;
+            'box-sizing:border-box;text-align:center;overflow:hidden;white-space:nowrap;' +
+            'cursor:pointer;' + (cssText || '');
+        el.style.display = 'none';
+        container.appendChild(el);
+        return el;
     }
 
-    // --- Track Menu buttons ---
-    createButton('tc-prev', '\u25C0\uFE0E', 'left:2vw;bottom:6vh;width:15vw;height:15vw;font-size:7vw;max-width:80px;max-height:80px;');
-    createButton('tc-next', '\u25B6\uFE0E', 'left:19vw;bottom:6vh;width:15vw;height:15vw;font-size:7vw;max-width:80px;max-height:80px;');
-    createButton('tc-select', 'SELECT', 'right:2vw;bottom:6vh;width:25vw;height:15vw;font-size:3.5vw;max-width:140px;max-height:80px;');
-    // Track name label (centred between arrows and select button)
-    createButton('tc-trackname', '', 'left:36vw;right:29vw;width:auto;bottom:6vh;height:15vw;max-height:80px;font-size:4vw;pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
-    // --- Track Preview buttons ---
-    createButton('tc-back', 'BACK', 'left:2vw;bottom:6vh;width:22vw;height:12vw;font-size:4.5vw;max-width:120px;max-height:70px;');
-    createButton('tc-start', 'START', 'right:2vw;bottom:6vh;width:22vw;height:12vw;font-size:4.5vw;max-width:120px;max-height:70px;');
+    // ── Track Menu ──
+    createEl('tc-prev', '\u25C0\uFE0E',
+        'left:2vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
+    createEl('tc-next', '\u25B6\uFE0E',
+        'left:18vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
+    createEl('tc-select', 'SELECT',
+        'right:2vw;bottom:6vh;width:22vw;height:14vw;font-size:min(3.5vw,18px);max-width:130px;max-height:75px;');
+    createEl('tc-trackname', '',
+        'left:34vw;right:26vw;width:auto;bottom:6vh;height:14vw;max-height:75px;font-size:min(3.8vw,20px);' +
+        'pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
 
-    // --- In-Game controls ---
-    // Left side: steering
-    createButton('tc-left', '\u25C0\uFE0E', 'left:2vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
-    createButton('tc-right', '\u25B6\uFE0E', 'left:15vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
-    // Right side: accel on top, brake below
-    createButton('tc-accel', '\u25B2\uFE0E', 'right:2vw;bottom:30vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
-    createButton('tc-brake', '\u25BC\uFE0E', 'right:2vw;bottom:6vh;width:11vw;height:11vw;font-size:5vw;max-width:65px;max-height:65px;');
-    // Centre: BOOST
-    createButton('tc-boost', 'BOOST', 'left:50%;bottom:6vh;width:20vw;height:11vw;font-size:3.5vw;max-width:110px;max-height:65px;transform:translateX(-50%);');
-    // Menu close button
-    createButton('tc-menu', '\u2715', 'right:2vw;top:2vh;width:10vw;height:10vw;font-size:5vw;max-width:55px;max-height:55px;');
+    // ── Track Preview ──
+    createEl('tc-back', 'MENU',
+        'left:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
+    createEl('tc-start', 'START',
+        'right:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
+    createEl('tc-opponent', '',
+        'left:26vw;right:26vw;width:auto;bottom:6vh;height:12vw;max-height:70px;font-size:min(3.5vw,18px);' +
+        'pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
 
-    // --- Game Over ---
-    // "GAME OVER" label (non-interactive, centred)
-    createButton('tc-gameover-label', 'GAME OVER', 'left:50%;top:40%;width:50vw;height:auto;font-size:7vw;max-width:300px;pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);transform:translate(-50%,-50%);');
-    // MENU button (same position as BOOST button)
-    createButton('tc-gameover', 'MENU', 'left:50%;bottom:6vh;width:18vw;height:11vw;font-size:3.5vw;max-width:100px;max-height:65px;transform:translateX(-50%);');
+    // ── In-Game driving controls (mobile only) ──
+    createEl('tc-left', '\u25C0\uFE0E',
+        'left:2vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
+    createEl('tc-right', '\u25B6\uFE0E',
+        'left:15vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
+    createEl('tc-accel', '\u25B2\uFE0E',
+        'right:2vw;bottom:30vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
+    createEl('tc-brake', '\u25BC\uFE0E',
+        'right:2vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
+    createEl('tc-boost', 'BOOST',
+        'left:50%;bottom:6vh;width:20vw;height:11vw;font-size:min(3.5vw,18px);max-width:110px;max-height:65px;transform:translateX(-50%);');
 
-    // --- In-Game HUD: boost and damage bars at top of screen ---
+    // ── In-Game close/menu button (shown for everyone) ──
+    createEl('tc-menu', '\u2715',
+        'right:2vw;top:2vh;width:10vw;height:10vw;font-size:min(5vw,28px);max-width:55px;max-height:55px;');
+
+    // ── Game Over ──
+    createEl('tc-gameover-label', '',
+        'left:50%;top:40%;width:50vw;height:auto;font-size:min(7vw,40px);max-width:300px;' +
+        'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
+        'transform:translate(-50%,-50%);');
+    createEl('tc-gameover', 'MENU',
+        'left:50%;bottom:6vh;width:18vw;height:11vw;font-size:min(3.5vw,18px);max-width:100px;max-height:65px;transform:translateX(-50%);');
+
+    // ── HUD bars (shown for everyone during gameplay) ──
     function createHudBar(id, icon, color) {
         var row = document.createElement('div');
         row.id = id;
         row.style.cssText = 'position:absolute;display:none;align-items:center;pointer-events:none;height:2.5vh;min-height:14px;';
         var iconEl = document.createElement('span');
         iconEl.textContent = icon;
-        iconEl.style.cssText = 'font-size:6vh;margin-right:1vw;line-height:1;';
+        iconEl.style.cssText = 'font-size:min(6vh,30px);margin-right:1vw;line-height:1;';
         var track = document.createElement('div');
         track.style.cssText = 'flex:1;height:100%;background:rgba(0,0,0,0.4);border-radius:4px;overflow:hidden;';
         var fill = document.createElement('div');
@@ -126,72 +143,75 @@ EM_JS(void, js_initTouchControls, (), {
         row.appendChild(track);
         container.appendChild(row);
     }
-    createHudBar('tc-hud-boost', '\uD83D\uDD25', '#ff9900');  // 🔥 fire emoji
+    createHudBar('tc-hud-boost', '\uD83D\uDD25', '#ff9900');
     document.getElementById('tc-hud-boost').style.cssText += 'left:2vw;right:50%;top:2vh;padding-right:1vw;';
-    createHudBar('tc-hud-damage', '\u26A0\uFE0F', '#ff3333'); // ⚠️ warning emoji
+    createHudBar('tc-hud-damage', '\u26A0\uFE0F', '#ff3333');
     document.getElementById('tc-hud-damage').style.cssText += 'left:50%;right:14vw;top:2vh;padding-left:1vw;';
 
-    // Track the current track index for cycling through tracks in menu
+    // ── Fade helper ──
+    window._fadeAndDo = function(callback) {
+        if (window._fading) return;
+        window._fading = true;
+        var f = document.getElementById('fadeOverlay');
+        f.style.opacity = '1';
+        setTimeout(function() {
+            callback();
+            setTimeout(function() { f.style.opacity = '0'; window._fading = false; }, 60);
+        }, 350);
+    };
+
+    // ── Track index state ──
     window._touchTrackIndex = 0;
 
-    // --- Key simulation helpers (for menu/preview buttons only) ---
-    function simulateKeyPress(keyCode) {
-        Module._touchKeyDown(keyCode);
-        setTimeout(function() { Module._touchKeyUp(keyCode); }, 100);
-    }
-
-    function addTapButton(id, callback) {
+    // ── Button interaction helpers ──
+    function addBtn(id, callback) {
         var el = document.getElementById(id);
-        el.addEventListener('touchstart', function(e) {
+        function handler(e) {
             e.preventDefault();
-            el.style.background = 'rgba(255,255,255,0.5)';
+            el.style.background = 'rgba(255,255,255,0.45)';
             callback();
-            setTimeout(function() {
-                el.style.background = 'rgba(255,255,255,0.25)';
-            }, 200);
-        }, {passive: false});
+            setTimeout(function() { el.style.background = 'rgba(255,255,255,0.18)'; }, 200);
+        }
+        el.addEventListener('touchstart', handler, {passive: false});
+        el.addEventListener('mousedown', handler);
     }
 
-    // --- Track Menu ---
-    addTapButton('tc-prev', function() {
+    // ── Track navigation helpers ──
+    function prevTrack() {
         window._touchTrackIndex--;
-        if (window._touchTrackIndex < 0) window._touchTrackIndex = 7;
-        simulateKeyPress(49 + window._touchTrackIndex);
-    });
-    addTapButton('tc-next', function() {
+        if (window._touchTrackIndex < 0) window._touchTrackIndex = Module._jsGetNumTracks() - 1;
+        Module._jsSelectTrack(window._touchTrackIndex);
+    }
+    function nextTrack() {
         window._touchTrackIndex++;
-        if (window._touchTrackIndex > 7) window._touchTrackIndex = 0;
-        simulateKeyPress(49 + window._touchTrackIndex);
-    });
-    addTapButton('tc-select', function() {
-        simulateKeyPress(83); // 'S'
+        if (window._touchTrackIndex >= Module._jsGetNumTracks()) window._touchTrackIndex = 0;
+        Module._jsSelectTrack(window._touchTrackIndex);
+    }
+
+    // ── Track Menu buttons ──
+    addBtn('tc-prev', prevTrack);
+    addBtn('tc-next', nextTrack);
+    addBtn('tc-select', function() {
+        if (Module._jsGetTrackID() < 0) return;
+        window._fadeAndDo(function() { Module._jsStartPreview(); });
     });
 
-    // --- Track Preview ---
-    addTapButton('tc-back', function() {
-        simulateKeyPress(77); // 'M'
+    // ── Track Preview buttons ──
+    addBtn('tc-back', function() {
+        window._fadeAndDo(function() { Module._jsGoToMenu(); });
     });
-    addTapButton('tc-start', function() {
-        simulateKeyPress(83); // 'S'
+    addBtn('tc-start', function() {
+        window._fadeAndDo(function() { Module._jsStartGame(-1); });
     });
 
-    // --- In-Game drive controls ---
-    // These directly set lastInput flags via touchSetDriveInput() so that
-    // BOOST works as a proper modifier (like the original Amiga fire button):
-    //   GAS alone        = accelerate (no boost)
-    //   GAS + BOOST held = accelerate WITH boost
-    //   BRK alone        = brake/reverse (no boost)
-    //   BRK + BOOST held = brake/reverse WITH boost
-    //
-    // Input flag constants (must match Car Behaviour.h):
+    // ── In-Game drive controls (touch only) ──
     var KEY_LEFT        = 0x01;
     var KEY_RIGHT       = 0x02;
-    var KEY_HASH        = 0x04;  // brake only
-    var KEY_BRAKE_BOOST = 0x08;  // brake + boost
-    var KEY_ACCEL_BOOST = 0x10;  // accel + boost
-    var KEY_ACCEL_ONLY  = 0x20;  // accel without boost
+    var KEY_HASH        = 0x04;
+    var KEY_BRAKE_BOOST = 0x08;
+    var KEY_ACCEL_BOOST = 0x10;
+    var KEY_ACCEL_ONLY  = 0x20;
 
-    // Track which drive buttons are currently held
     window._touchDrive = { left:false, right:false, gas:false, brake:false, boost:false };
 
     function updateDriveFlags() {
@@ -206,105 +226,142 @@ EM_JS(void, js_initTouchControls, (), {
         Module._touchSetDriveInput(flags);
     }
 
-    function addDriveButton(id, field) {
+    function addDriveBtn(id, field) {
         var el = document.getElementById(id);
         el.addEventListener('touchstart', function(e) {
             e.preventDefault();
-            el.style.background = 'rgba(255,255,255,0.5)';
+            el.style.background = 'rgba(255,255,255,0.45)';
             window._touchDrive[field] = true;
             updateDriveFlags();
         }, {passive: false});
         el.addEventListener('touchend', function(e) {
             e.preventDefault();
-            el.style.background = 'rgba(255,255,255,0.25)';
+            el.style.background = 'rgba(255,255,255,0.18)';
             window._touchDrive[field] = false;
             updateDriveFlags();
         }, {passive: false});
         el.addEventListener('touchcancel', function(e) {
             e.preventDefault();
-            el.style.background = 'rgba(255,255,255,0.25)';
+            el.style.background = 'rgba(255,255,255,0.18)';
             window._touchDrive[field] = false;
             updateDriveFlags();
         }, {passive: false});
     }
 
-    addDriveButton('tc-left', 'left');
-    addDriveButton('tc-right', 'right');
-    addDriveButton('tc-accel', 'gas');
-    addDriveButton('tc-brake', 'brake');
-    addDriveButton('tc-boost', 'boost');
+    addDriveBtn('tc-left', 'left');
+    addDriveBtn('tc-right', 'right');
+    addDriveBtn('tc-accel', 'gas');
+    addDriveBtn('tc-brake', 'brake');
+    addDriveBtn('tc-boost', 'boost');
 
-    // Menu button during game: press 'M'
-    addTapButton('tc-menu', function() {
-        simulateKeyPress(77);
+    // ── In-Game menu button ──
+    addBtn('tc-menu', function() {
+        window._fadeAndDo(function() { Module._jsGoToMenu(); });
     });
 
-    // --- Game Over ---
-    addTapButton('tc-gameover', function() {
-        simulateKeyPress(77);
+    // ── Game Over menu button ──
+    addBtn('tc-gameover', function() {
+        window._fadeAndDo(function() { Module._jsGoToMenu(); });
+    });
+
+    // ── Keyboard shortcuts for desktop ──
+    document.addEventListener('keydown', function(e) {
+        var mode = window._lastTouchGameMode;
+        if (mode === 0) { // TRACK_MENU
+            if (e.key === 'ArrowLeft')  { e.preventDefault(); prevTrack(); }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); nextTrack(); }
+            else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (Module._jsGetTrackID() >= 0) window._fadeAndDo(function() { Module._jsStartPreview(); }); }
+        } else if (mode === 1) { // TRACK_PREVIEW
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window._fadeAndDo(function() { Module._jsStartGame(-1); }); }
+            else if (e.key === 'Backspace' || e.key === 'Escape') { e.preventDefault(); window._fadeAndDo(function() { Module._jsGoToMenu(); }); }
+        } else if (mode === 2) { // GAME_IN_PROGRESS
+            if (e.key === 'Backspace' || e.key === 'Escape') { e.preventDefault(); window._fadeAndDo(function() { Module._jsGoToMenu(); }); }
+        } else if (mode === 3) { // GAME_OVER
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Backspace' || e.key === 'Escape') { e.preventDefault(); window._fadeAndDo(function() { Module._jsGoToMenu(); }); }
+        }
     });
 
     window._touchControlsReady = true;
     window._lastTouchGameMode = -1;
 });
 
-// Update which buttons are visible based on game mode
-EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int raceWonFlag, int boostVal, int boostMax, int damageVal), {
-    if (!window._isTouchDevice || !window._touchControlsReady) return;
+// ────────────────────────────────────────────────────────────────
+// Per-frame update — show/hide elements based on game mode
+// ────────────────────────────────────────────────────────────────
+EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int raceWonFlag,
+                                      int boostVal, int boostMax, int damageVal,
+                                      const char* opponentNamePtr, int raceFinishedFlag,
+                                      int lapNum), {
+    if (!window._touchControlsReady) return;
+
+    var TRACK_MENU = 0, TRACK_PREVIEW = 1, GAME_IN_PROGRESS = 2, GAME_OVER = 3;
+    var isMobile = window._isTouchDevice;
 
     if (gameMode !== window._lastTouchGameMode) {
         window._lastTouchGameMode = gameMode;
 
-    // Game mode constants (must match GameModeType enum)
-    var TRACK_MENU = 0;
-    var TRACK_PREVIEW = 1;
-    var GAME_IN_PROGRESS = 2;
-    var GAME_OVER = 3;
+        var menuBtns     = ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'];
+        var previewBtns  = ['tc-back', 'tc-start', 'tc-opponent'];
+        var gameDrive    = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost'];
+        var gameCommon   = ['tc-menu', 'tc-hud-boost', 'tc-hud-damage'];
+        var gameOverBtns = ['tc-gameover-label', 'tc-gameover'];
 
-    // All button ids grouped by mode
-    var menuBtns = ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'];
-    var previewBtns = ['tc-back', 'tc-start'];
-    var gameBtns = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost', 'tc-menu', 'tc-hud-boost', 'tc-hud-damage'];
-    var gameOverBtns = ['tc-gameover-label', 'tc-gameover'];
+        var allBtns = menuBtns.concat(previewBtns, gameDrive, gameCommon, gameOverBtns);
 
-    var allBtns = menuBtns.concat(previewBtns, gameBtns, gameOverBtns);
+        for (var i = 0; i < allBtns.length; i++) {
+            var el = document.getElementById(allBtns[i]);
+            if (el) el.style.display = 'none';
+        }
 
-    // Hide all
-    for (var i = 0; i < allBtns.length; i++) {
-        var el = document.getElementById(allBtns[i]);
-        if (el) el.style.display = 'none';
+        var show = [];
+        if (gameMode === TRACK_MENU)          show = menuBtns;
+        else if (gameMode === TRACK_PREVIEW)  show = previewBtns;
+        else if (gameMode === GAME_IN_PROGRESS) {
+            show = gameCommon.slice();
+            if (isMobile) show = show.concat(gameDrive);
+        }
+        else if (gameMode === GAME_OVER)      show = gameOverBtns;
+
+        for (var i = 0; i < show.length; i++) {
+            var el = document.getElementById(show[i]);
+            if (el) el.style.display = 'flex';
+        }
+
+        if (gameMode === GAME_OVER) {
+            var lbl = document.getElementById('tc-gameover-label');
+            if (lbl) lbl.textContent = raceWonFlag ? 'YOU WON' : 'YOU LOST';
+        }
     }
 
-    // Show buttons for current mode
-    var show = [];
-    if (gameMode === TRACK_MENU) show = menuBtns;
-    else if (gameMode === TRACK_PREVIEW) show = previewBtns;
-    else if (gameMode === GAME_IN_PROGRESS) show = gameBtns;
-    else if (gameMode === GAME_OVER) show = gameOverBtns;
-
-    for (var i = 0; i < show.length; i++) {
-        var el = document.getElementById(show[i]);
-        if (el) el.style.display = 'flex';
-    }
-
-    // Set game-over label text based on outcome
-    if (gameMode === GAME_OVER) {
-        var lbl = document.getElementById('tc-gameover-label');
-        if (lbl) lbl.textContent = raceWonFlag ? 'YOU WON' : 'YOU LOST';
-    }
-
-    } // end if (gameMode !== _lastTouchGameMode)
-
-    // Update the track name label every frame when on the track menu
-    if (gameMode === 0) {
+    // Track name (track menu)
+    if (gameMode === TRACK_MENU) {
         var label = document.getElementById('tc-trackname');
         if (label) {
             label.textContent = trackNamePtr ? UTF8ToString(trackNamePtr) : '';
         }
     }
 
-    // Update HUD bars every frame during gameplay
-    if (gameMode === 2 || gameMode === 3) {
+    // Opponent name (preview)
+    if (gameMode === TRACK_PREVIEW) {
+        var oppLabel = document.getElementById('tc-opponent');
+        if (oppLabel) {
+            oppLabel.textContent = opponentNamePtr ? 'vs ' + UTF8ToString(opponentNamePtr) : '';
+        }
+    }
+
+    // Flashing result label while race is finishing (before GAME_OVER)
+    if (gameMode === GAME_IN_PROGRESS && raceFinishedFlag) {
+        var lbl = document.getElementById('tc-gameover-label');
+        if (lbl) {
+            lbl.textContent = raceWonFlag ? 'RACE WON' : 'RACE LOST';
+            lbl.style.display = 'flex';
+            var flash = (Math.floor(Date.now() / 500) % 2 === 0);
+            lbl.style.opacity = flash ? '1' : '0.2';
+        }
+    }
+
+    // HUD bars (in-game + game over)
+    if (gameMode === GAME_IN_PROGRESS || gameMode === GAME_OVER) {
         var boostFill = document.getElementById('tc-hud-boost-fill');
         if (boostFill) {
             var pct = boostMax > 0 ? Math.round(100 * boostVal / boostMax) : 0;
@@ -318,8 +375,9 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
     }
 });
 
-// C functions that JS calls to inject key events
-// These go through the same KeyboardProc path as real keyboard input
+// ────────────────────────────────────────────────────────────────
+// C functions for JS to inject key events (keyboard still works)
+// ────────────────────────────────────────────────────────────────
 extern void CALLBACK KeyboardProc(UINT nChar, bool bKeyDown, bool bAltDown, void *pUserContext);
 
 extern "C" {
@@ -334,12 +392,18 @@ extern "C" {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// Public interface
+// ────────────────────────────────────────────────────────────────
 void initTouchControls() {
     js_initTouchControls();
 }
 
+extern WCHAR *opponentNames[];
+#define NUM_OPPONENTS 11
+
 void updateTouchControls() {
-    // Get the current track name as UTF-8 to pass to JS
+    // Track name
     static char trackNameBuf[128];
     const char* trackName = NULL;
     if (GameMode == TRACK_MENU) {
@@ -352,6 +416,18 @@ void updateTouchControls() {
             trackName = trackNameBuf;
         }
     }
+
+    // Opponent name
+    static char opponentNameBuf[128];
+    const char* opponentName = NULL;
+    if (opponentsID >= 0 && opponentsID < NUM_OPPONENTS) {
+        wcstombs(opponentNameBuf, opponentNames[opponentsID], sizeof(opponentNameBuf) - 1);
+        opponentNameBuf[sizeof(opponentNameBuf) - 1] = '\0';
+        opponentName = opponentNameBuf;
+    }
+
     js_updateTouchControls((int)GameMode, trackName, raceWon ? 1 : 0,
-                            (int)boostReserve, (int)StandardBoost, (int)new_damage);
+                            (int)boostReserve, (int)StandardBoost, (int)new_damage,
+                            opponentName, raceFinished ? 1 : 0,
+                            (int)lapNumber[PLAYER]);
 }

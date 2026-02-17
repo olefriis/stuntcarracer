@@ -18,6 +18,7 @@
 #include "Car Behaviour.h"
 #include "Opponent Behaviour.h"
 #include "wavefunctions.h"
+#include <emscripten.h>
 
 
 //-----------------------------------------------------------------------------
@@ -1200,58 +1201,8 @@ D3DXMATRIX matRot, matTemp, matTrans, matView;
 
 static void HandleTrackMenu( CDXUTTextHelper &txtHelper )
 	{
-	long i, track_number;
-	UINT firstMenuOption, lastMenuOption;
-
-
-	txtHelper.SetInsertionPos( 2, 15*8 );
-	txtHelper.DrawTextLine( L"Choose track :-" );
-
-	for (i = 0, firstMenuOption = '1'; i < NUM_TRACKS; i++)
-		{
-		txtHelper.DrawFormattedTextLine( L"'%d' -  %s", (i+1), GetTrackName(i) );
-		}
-	lastMenuOption = i + '1' - 1;
-
-	// output instructions
-	const D3DSURFACE_DESC *pd3dsdBackBuffer = DXUTGetBackBufferSurfaceDesc();
-	txtHelper.SetInsertionPos( 2, pd3dsdBackBuffer->Height-15*8 );
-	txtHelper.DrawFormattedTextLine( L"Current track - %s.  Press 'S' to select, Escape to quit", (TrackID == NO_TRACK ? L"None" : GetTrackName(TrackID)));
-
-	if ((keyPress >= firstMenuOption) && (keyPress <= lastMenuOption))
-		{
-		track_number = keyPress - firstMenuOption;	// start at 0
-
-		if (! ConvertAmigaTrack(track_number))
-			{
-#if defined(DEBUG) || defined(_DEBUG)
-			fprintf(out, "Failed to convert track %d\n", track_number);
-#endif
-			MessageBox(NULL, L"Failed to convert track", L"Error", MB_OK);	//temp
-			return;
-			}
-
-		if (CreateTrackVertexBuffer(DXUTGetD3DDevice()) != S_OK)
-			{
-#if defined(DEBUG) || defined(_DEBUG)
-			fprintf(out, "Failed to create track vertex buffer %d\n", track_number);
-#endif
-			MessageBox(NULL, L"Failed to create track vertex buffer", L"Error", MB_OK);	//temp
-			return;
-			}
-
-		keyPress = '\0';
-		}
-
-	if ((keyPress == 'S') && (TrackID != NO_TRACK))
-		{
-		bNewGame = TRUE;	// Used here just to reset the opponent's car, which is then shown during the track preview
-		ResetPlayer();		// Also reset player to clear values if there was a previous game (CarBehaviour normally does this, but isn't called for track preview)
-        GameMode = TRACK_PREVIEW;
-		bPlayerPaused = bOpponentPaused = FALSE;
-		keyPress = '\0';
-		}
-
+	// Track selection and mode transitions are now driven by JavaScript.
+	// The HTML overlay handles all UI.
 	return;
 	}
 
@@ -1264,33 +1215,8 @@ static void HandleTrackMenu( CDXUTTextHelper &txtHelper )
 
 static void HandleTrackPreview( CDXUTTextHelper &txtHelper )
 	{
-	// output instructions
-	const D3DSURFACE_DESC *pd3dsdBackBuffer = DXUTGetBackBufferSurfaceDesc();
-	txtHelper.SetInsertionPos( 2, pd3dsdBackBuffer->Height-15*9 );
-	txtHelper.DrawFormattedTextLine( L"Selected track - %s.  Press 'S' to start game, 'M' for track menu, Escape to quit", (TrackID == NO_TRACK ? L"None" : GetTrackName(TrackID)));
-	txtHelper.DrawTextLine( L"(Press F4 to change scenery, F9 / F10 to adjust frame rate)" );
-
-	txtHelper.SetInsertionPos( 2, pd3dsdBackBuffer->Height-15*6 );
-	txtHelper.DrawTextLine( L"Keyboard controls during game :-" );
-	txtHelper.DrawTextLine( L"  Arrow keys = Steer / Accelerate / Brake, Shift = Boost" );
-	txtHelper.DrawTextLine( L"  R = Point car in opposite direction, P = Pause, O = Unpause" );
-	txtHelper.DrawTextLine( L"  M = Back to track menu, Escape = Quit" );
-
-	if (keyPress == 'S')
-		{
-		bNewGame = TRUE;
-        GameMode = GAME_IN_PROGRESS;
-		// initialise game data
-		ResetLapData(OPPONENT);
-		ResetLapData(PLAYER);
-		gameStartTime = DXUTGetTime();
-		gameEndTime = 0;
-		boostReserve = StandardBoost;	// SuperBoost for super league
-		boostUnit = 0;
-		bPlayerPaused = bOpponentPaused = FALSE;
-		keyPress = '\0';
-		}
-
+	// Mode transitions are now driven by JavaScript.
+	// The HTML overlay handles all UI.
 	return;
 	}
 
@@ -1305,32 +1231,8 @@ extern WCHAR *opponentNames[];
 
 void RenderText( double fTime )
 {
-    // The helper object simply helps keep track of text position, and color
-    // and then it calls pFont->DrawText( m_pSprite, strMsg, -1, &rc, DT_NOCLIP, m_clr );
-    // If NULL is passed in as the sprite object, then it will work fine however the 
-    // pFont->DrawText() will not be batched together.  Batching calls will improve perf.
     CDXUTTextHelper txtHelper( g_pFont, g_pSprite, 15 );
-
-    // Output statistics
     txtHelper.Begin();
-	//txtHelper.SetForegroundColor( D3DXCOLOR( 1.0f, 1.0f, 1.0f, 1.0f ) );
-	txtHelper.SetForegroundColor( D3DXCOLOR( 1.0f, 1.0f, 0.0f, 1.0f ) );
-	if (bShowStats)
-	{
-		txtHelper.SetInsertionPos( 2, 0 );
-		txtHelper.DrawTextLine( DXUTGetFrameStats(true) );
-		txtHelper.DrawTextLine( DXUTGetDeviceStats() );
-		/*
-		txtHelper.DrawFormattedTextLine( L"fTime: %0.1f  sin(fTime): %0.4f", fTime, sin(fTime) );
-		*/
-#if defined(DEBUG) || defined(_DEBUG)
-		// Output VALUE1, VALUE, VALUE3
-		txtHelper.DrawFormattedTextLine( L"V1: %08x, V2: %08x, V3: %08x", VALUE1, VALUE2, VALUE3 );
-#else
-		// Output version
-		txtHelper.DrawTextLine( L"Version 1.0" );
-#endif
-	}
 
 	switch (GameMode)
 		{
@@ -1346,70 +1248,23 @@ void RenderText( double fTime )
 
 		case GAME_IN_PROGRESS:
 		case GAME_OVER:
-			// Show car speed, damage and race details
-			const D3DSURFACE_DESC *pd3dsdBackBuffer = DXUTGetBackBufferSurfaceDesc();
-			WCHAR lapText[3] = L"  ";
-			// Output opponent's name for four seconds at race start
-			if (((DXUTGetTime() - gameStartTime) < 4.0) && (opponentsID != NO_OPPONENT))
-			{
-				txtHelper.SetInsertionPos( 250, pd3dsdBackBuffer->Height-15*20 );
-				txtHelper.DrawFormattedTextLine( L"Opponent: %s", opponentNames[opponentsID] );
-			}
-			txtHelper.SetInsertionPos( 2, pd3dsdBackBuffer->Height-15*2 );
-			if (lapNumber[PLAYER] > 0)
-				StringCchPrintf( lapText, 3, L"%d", lapNumber[PLAYER] );
-			txtHelper.DrawFormattedTextLine( L"Lap: %s   Boost: %d", lapText, boostReserve );
-			txtHelper.DrawFormattedTextLine( L"Opponent Distance: %d", CalculateOpponentsDistance() );
-			txtHelper.SetInsertionPos( 280, pd3dsdBackBuffer->Height-15*2 );
-			txtHelper.DrawFormattedTextLine( L"Speed: %d", CalculateDisplaySpeed() );
-			txtHelper.DrawFormattedTextLine( L"Damage: %d", new_damage );
 			txtHelper.End();
 
+			// Handle the race-finished → GAME_OVER transition timer
 			if (raceFinished)
 			{
-				CDXUTTextHelper txtHelperLarge( g_pFontLarge, g_pSprite, 25 );
-
-				txtHelperLarge.Begin();
-
-				double currentTime = DXUTGetTime(), diffTime;
+				double currentTime = DXUTGetTime();
 				if (gameEndTime == 0.0)
 					gameEndTime = currentTime;
 
-				// Show race finished text for six seconds, then end the game
-				diffTime = currentTime - gameEndTime;
+				double diffTime = currentTime - gameEndTime;
 				if (diffTime > 6.0)
 				{
 					GameMode = GAME_OVER;
 				}
-
-				if (GameMode == GAME_OVER)
-				{
-					txtHelperLarge.SetInsertionPos( 124, pd3dsdBackBuffer->Height-25*12 );
-					txtHelperLarge.DrawTextLine( L"GAME OVER: Press 'M' for track menu" );
-				}
-				else
-				{
-					long intTime = (long)diffTime;
-					// Text flashes white/black, changing every half second
-					if ((diffTime - (double)intTime) < 0.5)
-						txtHelperLarge.SetForegroundColor( D3DXCOLOR( 1.0f, 1.0f, 1.0f, 1.0f ) );
-					else
-						txtHelperLarge.SetForegroundColor( D3DXCOLOR( 0.0f, 0.0f, 0.0f, 1.0f ) );
-
-					txtHelperLarge.SetInsertionPos( 250, pd3dsdBackBuffer->Height-25*12 );
-
-					if (raceWon)
-						txtHelperLarge.DrawTextLine( L"RACE WON" );
-					else
-						txtHelperLarge.DrawTextLine( L"RACE LOST" );
-				}
-
-				txtHelperLarge.End();
 			}
 			break;
 		}
-//	VALUE2 = raceFinished ? 1 : 0;
-//	VALUE3 = (long)gameEndTime;
 }
 
 
@@ -1632,6 +1487,7 @@ LRESULT CALLBACK MsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUserContext )
 {
     static bool shiftHeld = false;
+    static bool spaceHeld = false;
 
     if( bKeyDown )
     {
@@ -1711,15 +1567,15 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
             lastInput |= KEY_P1_RIGHT;
             break;
 
-        case VK_UP:	// Up arrow = accelerate (boost-aware via Shift)
-            if (shiftHeld)
+        case VK_UP:	// Up arrow = accelerate (boost-aware via Shift/Space)
+            if (shiftHeld || spaceHeld)
                 lastInput |= KEY_P1_ACCEL_BOOST;
             else
                 lastInput |= KEY_P1_ACCEL_ONLY;
             break;
 
-        case VK_DOWN:	// Down arrow = brake (boost-aware via Shift)
-            if (shiftHeld)
+        case VK_DOWN:	// Down arrow = brake (boost-aware via Shift/Space)
+            if (shiftHeld || spaceHeld)
                 lastInput |= KEY_P1_BRAKE_BOOST;
             else
                 lastInput |= KEY_P1_HASH;
@@ -1737,16 +1593,20 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
             }
             break;
 
+        case VK_SPACE:	// Space = boost modifier (same as Shift)
+            spaceHeld = true;
+            if (lastInput & KEY_P1_ACCEL_ONLY) {
+                lastInput &= ~KEY_P1_ACCEL_ONLY;
+                lastInput |= KEY_P1_ACCEL_BOOST;
+            }
+            if (lastInput & KEY_P1_HASH) {
+                lastInput &= ~KEY_P1_HASH;
+                lastInput |= KEY_P1_BRAKE_BOOST;
+            }
+            break;
+
         case 0xDE:	// couldn't find VK_ definition for HASH key
             lastInput |= KEY_P1_HASH;
-            break;
-
-		case VK_SPACE:
-            lastInput |= KEY_P1_BRAKE_BOOST;
-            break;
-
-        case VK_RETURN:
-            lastInput |= KEY_P1_ACCEL_BOOST;
             break;
         }
 
@@ -1784,28 +1644,36 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
             lastInput &= ~(KEY_P1_BRAKE_BOOST | KEY_P1_HASH);
             break;
 
-        case VK_SHIFT:	// Shift released — downgrade boost to non-boost
+        case VK_SHIFT:	// Shift released — downgrade boost (unless Space held)
             shiftHeld = false;
-            if (lastInput & KEY_P1_ACCEL_BOOST) {
-                lastInput &= ~KEY_P1_ACCEL_BOOST;
-                lastInput |= KEY_P1_ACCEL_ONLY;
+            if (!spaceHeld) {
+                if (lastInput & KEY_P1_ACCEL_BOOST) {
+                    lastInput &= ~KEY_P1_ACCEL_BOOST;
+                    lastInput |= KEY_P1_ACCEL_ONLY;
+                }
+                if (lastInput & KEY_P1_BRAKE_BOOST) {
+                    lastInput &= ~KEY_P1_BRAKE_BOOST;
+                    lastInput |= KEY_P1_HASH;
+                }
             }
-            if (lastInput & KEY_P1_BRAKE_BOOST) {
-                lastInput &= ~KEY_P1_BRAKE_BOOST;
-                lastInput |= KEY_P1_HASH;
+            break;
+
+        case VK_SPACE:	// Space released — downgrade boost (unless Shift held)
+            spaceHeld = false;
+            if (!shiftHeld) {
+                if (lastInput & KEY_P1_ACCEL_BOOST) {
+                    lastInput &= ~KEY_P1_ACCEL_BOOST;
+                    lastInput |= KEY_P1_ACCEL_ONLY;
+                }
+                if (lastInput & KEY_P1_BRAKE_BOOST) {
+                    lastInput &= ~KEY_P1_BRAKE_BOOST;
+                    lastInput |= KEY_P1_HASH;
+                }
             }
             break;
 
         case 0xDE:	// couldn't find VK_ definition for HASH key
             lastInput &= ~KEY_P1_HASH;
-            break;
-
-		case VK_SPACE:
-            lastInput &= ~KEY_P1_BRAKE_BOOST;
-            break;
-
-        case VK_RETURN:
-            lastInput &= ~KEY_P1_ACCEL_BOOST;
             break;
 		}
 	}
@@ -1852,6 +1720,79 @@ void CALLBACK OnDestroyDevice( void *pUserContext )
 	FreeShadowVertexBuffer();
 	FreeCarVertexBuffer();
 }
+
+
+//--------------------------------------------------------------------------------------
+// JavaScript API — exported functions for JS to drive the game flow
+//--------------------------------------------------------------------------------------
+extern long requestedOpponentID;
+
+extern "C" {
+
+// Select and load a track by index (0–7). Returns 1 on success, 0 on failure.
+EMSCRIPTEN_KEEPALIVE
+int jsSelectTrack(int trackIndex) {
+    if (trackIndex < 0 || trackIndex >= NUM_TRACKS) return 0;
+    if (!ConvertAmigaTrack(trackIndex)) return 0;
+    if (CreateTrackVertexBuffer(DXUTGetD3DDevice()) != S_OK) return 0;
+    return 1;
+}
+
+// Transition from track menu to track preview
+EMSCRIPTEN_KEEPALIVE
+void jsStartPreview() {
+    bNewGame = TRUE;
+    ResetPlayer();
+    GameMode = TRACK_PREVIEW;
+    bPlayerPaused = bOpponentPaused = FALSE;
+}
+
+// Start a race. opponentId: 0–10 for a specific opponent, -1 for random.
+EMSCRIPTEN_KEEPALIVE
+void jsStartGame(int opponentId) {
+    if (opponentId >= 0) {
+        requestedOpponentID = opponentId;
+    }
+    bNewGame = TRUE;
+    GameMode = GAME_IN_PROGRESS;
+    ResetLapData(OPPONENT);
+    ResetLapData(PLAYER);
+    gameStartTime = DXUTGetTime();
+    gameEndTime = 0;
+    boostReserve = StandardBoost;
+    boostUnit = 0;
+    bPlayerPaused = bOpponentPaused = FALSE;
+}
+
+// Return to the track menu
+EMSCRIPTEN_KEEPALIVE
+void jsGoToMenu() {
+    GameMode = TRACK_MENU;
+    opponentsID = NO_OPPONENT;
+    ResetDrawBridge();
+}
+
+// Query the currently loaded track ID (-1 if none)
+EMSCRIPTEN_KEEPALIVE
+int jsGetTrackID() { return (int)TrackID; }
+
+// Query the number of available tracks
+EMSCRIPTEN_KEEPALIVE
+int jsGetNumTracks() { return NUM_TRACKS; }
+
+// Is the race finished?
+EMSCRIPTEN_KEEPALIVE
+int jsIsRaceFinished() { return raceFinished ? 1 : 0; }
+
+// Did the player win?
+EMSCRIPTEN_KEEPALIVE
+int jsIsRaceWon() { return raceWon ? 1 : 0; }
+
+// Get the current opponent ID (-1 if none)
+EMSCRIPTEN_KEEPALIVE
+int jsGetOpponentId() { return (int)opponentsID; }
+
+} // extern "C"
 
 
 //--------------------------------------------------------------------------------------
