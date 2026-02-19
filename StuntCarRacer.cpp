@@ -76,6 +76,7 @@ extern long boostReserve, boostUnit, StandardBoost, SuperBoost;
 extern long INITIALISE_PLAYER;
 extern bool raceFinished, raceWon;
 extern long lapNumber[];
+bool playerWrecked = false;
 
 
 //-----------------------------------------------------------------------------
@@ -1250,6 +1251,14 @@ void RenderText( double fTime )
 		case GAME_OVER:
 			txtHelper.End();
 
+			// Detect wrecked (max damage)
+			if (!raceFinished && GameMode == GAME_IN_PROGRESS && new_damage >= 255)
+			{
+				raceFinished = true;
+				raceWon = false;
+				playerWrecked = true;
+			}
+
 			// Handle the race-finished → GAME_OVER transition timer
 			if (raceFinished)
 			{
@@ -1762,6 +1771,7 @@ void jsStartGame(int opponentId) {
     boostReserve = StandardBoost;
     boostUnit = 0;
     bPlayerPaused = bOpponentPaused = FALSE;
+    playerWrecked = false;
 }
 
 // Return to the track menu
@@ -1787,6 +1797,10 @@ int jsIsRaceFinished() { return raceFinished ? 1 : 0; }
 // Did the player win?
 EMSCRIPTEN_KEEPALIVE
 int jsIsRaceWon() { return raceWon ? 1 : 0; }
+
+// Is the player wrecked (max damage)?
+EMSCRIPTEN_KEEPALIVE
+int jsIsPlayerWrecked() { return playerWrecked ? 1 : 0; }
 
 // Get the current opponent ID (-1 if none)
 EMSCRIPTEN_KEEPALIVE

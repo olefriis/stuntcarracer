@@ -110,12 +110,18 @@ EM_JS(void, js_initTouchControls, (), {
         'right:2vw;bottom:30vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
     createEl('tc-brake', '\u25BC\uFE0E',
         'right:2vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
-    createEl('tc-boost', 'BOOST',
-        'left:50%;bottom:6vh;width:20vw;height:11vw;font-size:min(3.5vw,18px);max-width:110px;max-height:65px;transform:translateX(-50%);');
+    createEl('tc-boost', '\u00A0\uD83D\uDD25\u00A0',
+        'left:50%;bottom:6vh;width:22vw;height:11vw;font-size:min(5vw,28px);max-width:120px;max-height:65px;transform:translateX(-50%);');
 
     // ── In-Game close/menu button (shown for everyone) ──
     createEl('tc-menu', '\u2715',
         'right:2vw;top:2vh;width:10vw;height:10vw;font-size:min(5vw,28px);max-width:55px;max-height:55px;');
+
+    // ── In-Game lap counter (shown for everyone) ──
+    createEl('tc-lap', '',
+        'right:2vw;top:calc(2vh + 10vw + 1vh);width:auto;height:auto;font-size:min(3vw,16px);' +
+        'padding:0.4em 0.8em;max-width:120px;pointer-events:none;' +
+        'background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);border-radius:8px;');
 
     // ── Game Over ──
     createEl('tc-gameover-label', '',
@@ -291,7 +297,7 @@ EM_JS(void, js_initTouchControls, (), {
 EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int raceWonFlag,
                                       int boostVal, int boostMax, int damageVal,
                                       const char* opponentNamePtr, int raceFinishedFlag,
-                                      int lapNum), {
+                                      int lapNum, int wreckedFlag), {
     if (!window._touchControlsReady) return;
 
     var TRACK_MENU = 0, TRACK_PREVIEW = 1, GAME_IN_PROGRESS = 2, GAME_OVER = 3;
@@ -303,7 +309,7 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
         var menuBtns     = ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'];
         var previewBtns  = ['tc-back', 'tc-start', 'tc-opponent'];
         var gameDrive    = ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost'];
-        var gameCommon   = ['tc-menu', 'tc-hud-boost', 'tc-hud-damage'];
+        var gameCommon   = ['tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage'];
         var gameOverBtns = ['tc-gameover-label', 'tc-gameover'];
 
         var allBtns = menuBtns.concat(previewBtns, gameDrive, gameCommon, gameOverBtns);
@@ -329,7 +335,7 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
 
         if (gameMode === GAME_OVER) {
             var lbl = document.getElementById('tc-gameover-label');
-            if (lbl) lbl.textContent = raceWonFlag ? 'YOU WON' : 'YOU LOST';
+            if (lbl) lbl.textContent = wreckedFlag ? 'WRECKED' : (raceWonFlag ? 'YOU WON' : 'YOU LOST');
         }
     }
 
@@ -353,10 +359,24 @@ EM_JS(void, js_updateTouchControls, (int gameMode, const char* trackNamePtr, int
     if (gameMode === GAME_IN_PROGRESS && raceFinishedFlag) {
         var lbl = document.getElementById('tc-gameover-label');
         if (lbl) {
-            lbl.textContent = raceWonFlag ? 'RACE WON' : 'RACE LOST';
+            lbl.textContent = wreckedFlag ? 'WRECKED' : (raceWonFlag ? 'RACE WON' : 'RACE LOST');
             lbl.style.display = 'flex';
             var flash = (Math.floor(Date.now() / 500) % 2 === 0);
             lbl.style.opacity = flash ? '1' : '0.2';
+        }
+    }
+
+    // Lap counter (in-game)
+    if (gameMode === GAME_IN_PROGRESS) {
+        var lapEl = document.getElementById('tc-lap');
+        if (lapEl) {
+            if (lapNum < 1) {
+                lapEl.style.display = 'none';
+            } else {
+                lapEl.style.display = 'flex';
+                var current = Math.min(lapNum, 3);
+                lapEl.textContent = 'Lap ' + current + '/3';
+            }
         }
     }
 
@@ -402,6 +422,8 @@ void initTouchControls() {
 extern WCHAR *opponentNames[];
 #define NUM_OPPONENTS 11
 
+extern bool playerWrecked;
+
 void updateTouchControls() {
     // Track name
     static char trackNameBuf[128];
@@ -429,5 +451,5 @@ void updateTouchControls() {
     js_updateTouchControls((int)GameMode, trackName, raceWon ? 1 : 0,
                             (int)boostReserve, (int)StandardBoost, (int)new_damage,
                             opponentName, raceFinished ? 1 : 0,
-                            (int)lapNumber[PLAYER]);
+                            (int)lapNumber[PLAYER], playerWrecked ? 1 : 0);
 }

@@ -23,7 +23,7 @@ EMCC_FLAGS = \
 	-O2 \
 	-ferror-limit=1000 \
 	-s LLD_REPORT_UNDEFINED \
-	-s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsGetOpponentId"]' \
+	-s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsIsPlayerWrecked","_jsGetOpponentId"]' \
 	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
 	-lopenal \
 	--use-preload-plugins \
