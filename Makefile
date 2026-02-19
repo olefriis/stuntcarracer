@@ -23,8 +23,8 @@ EMCC_FLAGS = \
 	-O2 \
 	-ferror-limit=1000 \
 	-s LLD_REPORT_UNDEFINED \
-	-s EXPORTED_FUNCTIONS='["_main","_touchKeyDown","_touchKeyUp","_getTouchGameMode","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsIsPlayerWrecked","_jsGetOpponentId"]' \
-	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+	-s EXPORTED_FUNCTIONS='["_main","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsIsPlayerWrecked","_jsGetOpponentId","_jsGetBoostReserve","_jsGetBoostMax","_jsGetDamage","_jsGetLapNumber","_jsGetGameMode","_jsSetGameOver","_jsGetTrackName","_jsGetOpponentName"]' \
+	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString"]' \
 	-lopenal \
 	--use-preload-plugins \
 	-s USE_SDL_IMAGE=2 \
@@ -37,7 +37,7 @@ EMCC_FLAGS = \
 DIST = dist
 
 # Static PWA assets to copy into dist/ for production builds
-PWA_ASSETS = manifest.json sw.js icon-192.png icon-512.png
+PWA_ASSETS = manifest.json sw.js icon-192.png icon-512.png game.js
 
 # ─── Targets ────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS))
 
 debug: $(DIST)/source.html
 
-$(DIST)/source.html: $(SOURCES) custom_shell.html | $(DIST)
+$(DIST)/source.html: $(SOURCES) custom_shell.html game.js | $(DIST)
 	@echo "Building…"
 	@if [ "$(MAKECMDGOALS)" = "debug" ]; then \
 		echo "  (debug build)"; \

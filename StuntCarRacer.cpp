@@ -1258,20 +1258,6 @@ void RenderText( double fTime )
 				raceWon = false;
 				playerWrecked = true;
 			}
-
-			// Handle the race-finished → GAME_OVER transition timer
-			if (raceFinished)
-			{
-				double currentTime = DXUTGetTime();
-				if (gameEndTime == 0.0)
-					gameEndTime = currentTime;
-
-				double diffTime = currentTime - gameEndTime;
-				if (diffTime > 6.0)
-				{
-					GameMode = GAME_OVER;
-				}
-			}
 			break;
 		}
 }
@@ -1805,6 +1791,51 @@ int jsIsPlayerWrecked() { return playerWrecked ? 1 : 0; }
 // Get the current opponent ID (-1 if none)
 EMSCRIPTEN_KEEPALIVE
 int jsGetOpponentId() { return (int)opponentsID; }
+
+// Get current boost reserve
+EMSCRIPTEN_KEEPALIVE
+int jsGetBoostReserve() { return (int)boostReserve; }
+
+// Get max boost
+EMSCRIPTEN_KEEPALIVE
+int jsGetBoostMax() { return (int)StandardBoost; }
+
+// Get current damage (0–255)
+EMSCRIPTEN_KEEPALIVE
+int jsGetDamage() { return (int)new_damage; }
+
+// Get player lap number
+EMSCRIPTEN_KEEPALIVE
+int jsGetLapNumber() { return (int)lapNumber[PLAYER]; }
+
+// Get the current game mode
+EMSCRIPTEN_KEEPALIVE
+int jsGetGameMode() { return (int)GameMode; }
+
+// Set game to GAME_OVER mode (called by JS when race-end timer expires)
+EMSCRIPTEN_KEEPALIVE
+void jsSetGameOver() { GameMode = GAME_OVER; }
+
+// Get track name as UTF-8 string (returns pointer to static buffer)
+EMSCRIPTEN_KEEPALIVE
+const char* jsGetTrackName() {
+    static char buf[128];
+    if (TrackID == NO_TRACK) return "";
+    WCHAR* name = GetTrackName(TrackID);
+    wcstombs(buf, name, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    return buf;
+}
+
+// Get opponent name as UTF-8 string (returns pointer to static buffer)
+EMSCRIPTEN_KEEPALIVE
+const char* jsGetOpponentName() {
+    static char buf[128];
+    if (opponentsID < 0 || opponentsID >= 11) return "";
+    wcstombs(buf, opponentNames[opponentsID], sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    return buf;
+}
 
 } // extern "C"
 
