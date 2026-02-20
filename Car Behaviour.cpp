@@ -4098,16 +4098,23 @@ PlayCreakSound:
 #define	LAP_THAT_FINISHES_RACE (4)
 
 extern long opponents_current_piece;	// use as opponents_road_section
+extern bool soloMode;
 
 bool raceFinished, raceWon;
 long lapNumber[NUM_CARS];
 static bool carOnFirstHalfOfLap[NUM_CARS] = {false, false};
+
+// Lap timing for best-lap tracking
+double lapStartTime[NUM_CARS] = {0, 0};
+double bestLapTime[NUM_CARS] = {0, 0};
 
 void ResetLapData (long car)
 {
 	raceFinished = raceWon = FALSE;
 	lapNumber[car] = 0;
 	carOnFirstHalfOfLap[car] = false;
+	lapStartTime[car] = 0;
+	bestLapTime[car] = 0;
 }
 
 void UpdateLapData (void)
@@ -4127,6 +4134,16 @@ void UpdateLapData (void)
 		{
 			carOnFirstHalfOfLap[car] = true;
 			++lapNumber[car];
+
+			// Record lap time and update best lap
+			double now = DXUTGetTime();
+			if (lapStartTime[car] > 0 && lapNumber[car] >= 2)
+			{
+				double elapsed = now - lapStartTime[car];
+				if (bestLapTime[car] <= 0 || elapsed < bestLapTime[car])
+					bestLapTime[car] = elapsed;
+			}
+			lapStartTime[car] = now;
 		}
 	}
 
@@ -4137,13 +4154,19 @@ void UpdateLapData (void)
 	{
 		if (!raceFinished)
 		{
+			// In solo mode, only the player can trigger race end
+			if (soloMode && car == OPPONENT)
+				continue;
+
 			if (lapNumber[car] == LAP_THAT_FINISHES_RACE)
 			{
 				raceFinished = true;
 
 				// frames to show message for = 44; about 5.64 seconds
 
-				if (CalculateIfWinning(start_finish_piece) < 0)
+				if (soloMode)
+					raceWon = true;
+				else if (CalculateIfWinning(start_finish_piece) < 0)
 					raceWon = true;
 				else
 					raceWon = false;

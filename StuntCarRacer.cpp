@@ -76,7 +76,9 @@ extern long boostReserve, boostUnit, StandardBoost, SuperBoost;
 extern long INITIALISE_PLAYER;
 extern bool raceFinished, raceWon;
 extern long lapNumber[];
+extern double bestLapTime[];
 bool playerWrecked = false;
+bool soloMode = false;
 
 
 //-----------------------------------------------------------------------------
@@ -1397,6 +1399,7 @@ HRESULT hr;
 		DrawTrack(pd3dDevice);
 
 		// Draw shadow with interpolated offset so it follows the smoothly-moving car
+		if (!soloMode)
 		{
 			D3DXMATRIX interpMtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
 			// Shadow vertices are stored at newMtx positions (the last game-logic frame).
@@ -1417,6 +1420,7 @@ HRESULT hr;
 				break;
 
 			case TRACK_PREVIEW:
+				if (!soloMode)
 				{
 				// Draw Opponent's Car
 					D3DMATRIX mtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
@@ -1427,6 +1431,7 @@ HRESULT hr;
 
 			case GAME_IN_PROGRESS:
 			case GAME_OVER:
+				if (!soloMode)
 				{
 				// Draw Opponent's Car
 					D3DMATRIX mtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
@@ -1742,11 +1747,16 @@ void jsStartPreview() {
     bPlayerPaused = bOpponentPaused = FALSE;
 }
 
-// Start a race. opponentId: 0–10 for a specific opponent, -1 for random.
+// Start a race. opponentId: 0–10 for a specific opponent, -1 for random, -2 for solo.
 EMSCRIPTEN_KEEPALIVE
 void jsStartGame(int opponentId) {
-    if (opponentId >= 0) {
-        requestedOpponentID = opponentId;
+    if (opponentId == -2) {
+        soloMode = true;
+    } else {
+        soloMode = false;
+        if (opponentId >= 0) {
+            requestedOpponentID = opponentId;
+        }
     }
     bNewGame = TRUE;
     GameMode = GAME_IN_PROGRESS;
@@ -1765,6 +1775,7 @@ EMSCRIPTEN_KEEPALIVE
 void jsGoToMenu() {
     GameMode = TRACK_MENU;
     opponentsID = NO_OPPONENT;
+    soloMode = false;
     ResetDrawBridge();
 }
 
@@ -1836,6 +1847,18 @@ const char* jsGetOpponentName() {
     buf[sizeof(buf) - 1] = '\0';
     return buf;
 }
+
+// Get player's best lap time in milliseconds (0 if none)
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerBestLap() { return (int)(bestLapTime[PLAYER]); }
+
+// Get opponent's best lap time in milliseconds (0 if none)
+EMSCRIPTEN_KEEPALIVE
+int jsGetOpponentBestLap() { return (int)(bestLapTime[OPPONENT]); }
+
+// Is solo mode active?
+EMSCRIPTEN_KEEPALIVE
+int jsIsSoloMode() { return soloMode ? 1 : 0; }
 
 } // extern "C"
 

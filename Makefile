@@ -23,7 +23,7 @@ EMCC_FLAGS = \
 	-O2 \
 	-ferror-limit=1000 \
 	-s LLD_REPORT_UNDEFINED \
-	-s EXPORTED_FUNCTIONS='["_main","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsIsPlayerWrecked","_jsGetOpponentId","_jsGetBoostReserve","_jsGetBoostMax","_jsGetDamage","_jsGetLapNumber","_jsGetGameMode","_jsSetGameOver","_jsGetTrackName","_jsGetOpponentName"]' \
+	-s EXPORTED_FUNCTIONS='["_main","_touchSetDriveInput","_jsSelectTrack","_jsStartPreview","_jsStartGame","_jsGoToMenu","_jsGetTrackID","_jsGetNumTracks","_jsIsRaceFinished","_jsIsRaceWon","_jsIsPlayerWrecked","_jsGetOpponentId","_jsGetBoostReserve","_jsGetBoostMax","_jsGetDamage","_jsGetLapNumber","_jsGetGameMode","_jsSetGameOver","_jsGetTrackName","_jsGetOpponentName","_jsGetPlayerBestLap","_jsGetOpponentBestLap","_jsIsSoloMode"]' \
 	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString"]' \
 	-lopenal \
 	--use-preload-plugins \

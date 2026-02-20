@@ -5,43 +5,185 @@
  * It polls the C++ engine each frame via Module._jsXxx() exported functions
  * and calls into C++ to trigger state changes (select track, start race, etc.).
  *
- * State flow:
- *   TRACK_MENU  →  TRACK_PREVIEW  →  GAME_IN_PROGRESS  →  GAME_OVER  →  TRACK_MENU
- *
- * All transitions use a short fade-to-black CSS animation for a polished feel.
+ * Modes:
+ *   MAIN_MENU  →  (Practise) TRACK_MENU → TRACK_PREVIEW → race → result → TRACK_MENU
+ *              →  (Season)   season flow with schedule, results, standings
  */
 
 (function () {
   'use strict';
 
   // ── Game modes (must match C++ GameModeType enum) ───────────
-  var TRACK_MENU      = 0;
-  var TRACK_PREVIEW   = 1;
+  var TRACK_MENU       = 0;
+  var TRACK_PREVIEW    = 1;
   var GAME_IN_PROGRESS = 2;
-  var GAME_OVER       = 3;
+  var GAME_OVER        = 3;
 
   // ── Key bitmask constants (must match C++ KEY_P1_* defines) ─
-  var KEY_LEFT        = 0x01;
-  var KEY_RIGHT       = 0x02;
-  var KEY_HASH        = 0x04;
-  var KEY_BRAKE_BOOST = 0x08;
-  var KEY_ACCEL_BOOST = 0x10;
-  var KEY_ACCEL_ONLY  = 0x20;
+  var KEY_LEFT         = 0x01;
+  var KEY_RIGHT        = 0x02;
+  var KEY_HASH         = 0x04;
+  var KEY_BRAKE_BOOST  = 0x08;
+  var KEY_ACCEL_BOOST  = 0x10;
+  var KEY_ACCEL_ONLY   = 0x20;
+
+  // ══════════════════════════════════════════════════════════════
+  //  TOURNAMENT DATA  (from original Amiga source)
+  // ══════════════════════════════════════════════════════════════
+
+  var OPPONENT_NAMES = [
+    'Hot Rod', 'Whizz Kid', 'Bad Guy', 'The Dodger', 'Big Ed',
+    'Max Boost', 'Dare Devil', 'High Flyer', 'Bully Boy',
+    'Jumping Jack', 'Road Hog'
+  ];
+
+  var TRACK_NAMES = [
+    'Little Ramp', 'Stepping Stones', 'Hump Back', 'Big Ramp',
+    'Ski Jump', 'Draw Bridge', 'High Jump', 'Roller Coaster'
+  ];
+
+  // Base strength for computer vs computer outcomes (index 0 = strongest)
+  var BASE_STRENGTH = [120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 10];
+
+  // Tracks per division: index 0 = Div 4 (lowest), index 3 = Div 1 (top)
+  var DIVISION_TRACKS = [
+    [0, 2],  // Div 4: Little Ramp, Hump Back
+    [1, 3],  // Div 3: Stepping Stones, Big Ramp
+    [6, 7],  // Div 2: High Jump, Roller Coaster
+    [4, 5]   // Div 1: Ski Jump, Draw Bridge
+  ];
+
+  // Starting division assignments: index = driver ID (0–11), value = division (0=Div4, 3=Div1)
+  // Human player is index 11
+  var INITIAL_DIVISIONS = [3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0];
+
+  var HUMAN_PLAYER = 11;
+
+  // Race pairing offsets within a 3-player division:
+  // 6 races: each pair plays each track
+  var PAIR_A     = [0, 0, 0, 0, 1, 1];
+  var PAIR_B     = [1, 1, 2, 2, 2, 2];
+  var RACE_TRACK = [0, 1, 0, 1, 0, 1];
 
   // ── State ──────────────────────────────────────────────────
   var trackIndex     = 0;
-  var lastGameMode   = -1;
   var fading         = false;
-  var raceEndTime    = 0;     // timestamp when race ended (for 6-second timer)
+  var raceEndTime    = 0;
   var isMobile       = false;
   var ready          = false;
+
+  // UI mode (our own higher-level state on top of C++ GameMode)
+  var UI_MAIN_MENU       = 'main_menu';
+  var UI_PRACTISE_MENU   = 'practise_menu';
+  var UI_PRACTISE_PREVIEW = 'practise_preview';
+  var UI_PRACTISE_RACE   = 'practise_race';
+  var UI_PRACTISE_RESULT = 'practise_result';
+  var UI_SEASON_PRE_RACE = 'season_pre_race';
+  var UI_SEASON_RACE     = 'season_race';
+  var UI_SEASON_RESULT   = 'season_result';
+  var UI_SEASON_STANDINGS = 'season_standings';
+
+  var uiMode = UI_MAIN_MENU;
 
   // Touch drive state (mobile only)
   var touchDrive = { left: false, right: false, gas: false, brake: false, boost: false };
 
+  // ── Season state ───────────────────────────────────────────
+  var season = null;
+  var humanDivision = 0;
+  var currentDivAssign = INITIAL_DIVISIONS.slice();
+
+  function createNewSeason(divAssign) {
+    // divAssign: array[12], index = driverID, value = division (0-3)
+    var divisions = [[], [], [], []];
+    for (var i = 0; i < 12; i++) {
+      divisions[divAssign[i]].push(i);
+    }
+
+    // Random strength for each driver this season
+    var strengths = [];
+    for (var i = 0; i < 12; i++) {
+      strengths.push(BASE_STRENGTH[i] + Math.floor(Math.random() * 64));
+    }
+
+    var humanDiv = divAssign[HUMAN_PLAYER];
+
+    // Build race schedule for the human's division
+    var divPlayers = divisions[humanDiv].slice();
+    var schedule = [];
+    for (var r = 0; r < 6; r++) {
+      var a = divPlayers[PAIR_A[r]];
+      var b = divPlayers[PAIR_B[r]];
+      var tIdx = DIVISION_TRACKS[humanDiv][RACE_TRACK[r]];
+      schedule.push({
+        driverA: a, driverB: b, trackIndex: tIdx,
+        isHumanRace: (a === HUMAN_PLAYER || b === HUMAN_PLAYER),
+        played: false, winnerDriver: -1, bestLapDriver: -1,
+        playerBestLapMs: 0
+      });
+    }
+
+    // Points tracker
+    var points = [];
+    for (var i = 0; i < 12; i++) points.push({ wins: 0, bestLaps: 0 });
+
+    return {
+      divAssign: divAssign.slice(),
+      divisions: divisions,
+      strengths: strengths,
+      humanDiv: humanDiv,
+      schedule: schedule,
+      currentRace: 0,
+      points: points
+    };
+  }
+
+  function resolveComputerRace(race) {
+    var sA = season.strengths[race.driverA];
+    var sB = season.strengths[race.driverB];
+    var winner, loser;
+    if (sA > sB)       { winner = race.driverA; loser = race.driverB; }
+    else if (sB > sA)  { winner = race.driverB; loser = race.driverA; }
+    else               { // tie → coin flip
+      if (Math.random() < 0.5) { winner = race.driverA; loser = race.driverB; }
+      else                     { winner = race.driverB; loser = race.driverA; }
+    }
+    race.winnerDriver = winner;
+    race.bestLapDriver = loser;   // Amiga original: loser gets best lap
+    race.played = true;
+    season.points[winner].wins++;
+    season.points[loser].bestLaps++;
+  }
+
+  function driverName(id) {
+    if (id === HUMAN_PLAYER) return 'You';
+    return OPPONENT_NAMES[id];
+  }
+
+  function driverPoints(id) {
+    var p = season.points[id];
+    return p.wins * 2 + p.bestLaps;
+  }
+
+  function divStandings(divIdx) {
+    var players = season.divisions[divIdx].slice();
+    players.sort(function (a, b) {
+      var pa = driverPoints(a), pb = driverPoints(b);
+      if (pb !== pa) return pb - pa;
+      return season.points[b].wins - season.points[a].wins;
+    });
+    return players;
+  }
+
+  function divLabel(idx) { return 'Division ' + (4 - idx); }
+
+  function fmtLap(ms) {
+    if (!ms || ms <= 0) return '-';
+    var s = ms / 1000, m = Math.floor(s / 60);
+    return m + ':' + ((s - m * 60) < 10 ? '0' : '') + (s - m * 60).toFixed(2);
+  }
+
   // ── C++ API helpers ────────────────────────────────────────
-  // These are thin wrappers so the rest of the code reads nicely.
-  // They are only valid after the Emscripten runtime has initialised.
 
   function getGameMode()       { return Module._jsGetGameMode(); }
   function getTrackID()        { return Module._jsGetTrackID(); }
@@ -53,14 +195,11 @@
   function getBoostMax()       { return Module._jsGetBoostMax(); }
   function getDamage()         { return Module._jsGetDamage(); }
   function getLapNumber()      { return Module._jsGetLapNumber(); }
-  function getOpponentId()     { return Module._jsGetOpponentId(); }
+  function getPlayerBestLap()  { return Module._jsGetPlayerBestLap(); }
+  function getOpponentBestLap(){ return Module._jsGetOpponentBestLap(); }
 
   function getTrackName() {
     var ptr = Module._jsGetTrackName();
-    return ptr ? Module.UTF8ToString(ptr) : '';
-  }
-  function getOpponentName() {
-    var ptr = Module._jsGetOpponentName();
     return ptr ? Module.UTF8ToString(ptr) : '';
   }
 
@@ -101,7 +240,9 @@
     selectTrack(trackIndex);
   }
 
-  // ── UI creation ────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  //  UI CREATION
+  // ══════════════════════════════════════════════════════════════
 
   function createUI() {
     isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -122,7 +263,6 @@
       'pointer-events:none;z-index:100;user-select:none;-webkit-user-select:none;';
     document.body.appendChild(container);
 
-    // Helper: create a styled element inside the container
     function el(id, text, css) {
       var d = document.createElement('div');
       d.id = id;
@@ -141,25 +281,36 @@
       return d;
     }
 
-    // ── Track Menu ──
+    // ── Main Menu ──
+    el('mm-title', 'STUNT CAR RACER',
+      'left:50%;top:18%;width:70vw;height:auto;max-width:400px;font-size:min(6vw,32px);' +
+      'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
+      'transform:translateX(-50%);');
+    el('mm-practise', 'Practise',
+      'left:50%;top:40%;width:50vw;height:14vw;max-width:280px;max-height:70px;' +
+      'font-size:min(5vw,26px);transform:translateX(-50%);');
+    el('mm-season', 'Start the Racing Season',
+      'left:50%;top:calc(40% + 16vw);width:50vw;height:14vw;max-width:280px;max-height:70px;' +
+      'font-size:min(5vw,26px);transform:translateX(-50%);');
+
+    // ── Track Menu (practise) ──
     el('tc-prev', '\u25C0\uFE0E',
       'left:2vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
     el('tc-next', '\u25B6\uFE0E',
       'left:18vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
-    el('tc-select', 'SELECT',
+    el('tc-select', 'Select',
       'right:2vw;bottom:6vh;width:22vw;height:14vw;font-size:min(3.5vw,18px);max-width:130px;max-height:75px;');
     el('tc-trackname', '',
       'left:34vw;right:26vw;width:auto;bottom:6vh;height:14vw;max-height:75px;font-size:min(3.8vw,20px);' +
       'pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
+    el('tc-backmain', 'Menu',
+      'left:2vw;top:2vh;width:18vw;height:10vw;font-size:min(3.5vw,18px);max-width:100px;max-height:55px;');
 
-    // ── Track Preview ──
-    el('tc-back', 'MENU',
+    // ── Track Preview (practise) ──
+    el('tc-back', 'Back',
       'left:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
-    el('tc-start', 'START',
+    el('tc-start', 'Start',
       'right:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
-    el('tc-opponent', '',
-      'left:26vw;right:26vw;width:auto;bottom:6vh;height:12vw;max-height:70px;font-size:min(3.5vw,18px);' +
-      'pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
 
     // ── In-Game driving controls (mobile only) ──
     el('tc-left', '\u25C0\uFE0E',
@@ -173,7 +324,7 @@
     el('tc-boost', '\u00A0\uD83D\uDD25\u00A0',
       'left:50%;bottom:6vh;width:22vw;height:11vw;font-size:min(5vw,28px);max-width:120px;max-height:65px;transform:translateX(-50%);');
 
-    // ── In-Game common (shown for everyone) ──
+    // ── In-Game common ──
     el('tc-menu', '\u2715',
       'right:2vw;top:2vh;width:10vw;height:10vw;font-size:min(5vw,28px);max-width:55px;max-height:55px;');
     el('tc-lap', '',
@@ -181,12 +332,12 @@
       'padding:0.4em 0.8em;max-width:120px;pointer-events:none;' +
       'background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);border-radius:8px;');
 
-    // ── Game Over ──
+    // ── Game Over / result label ──
     el('tc-gameover-label', '',
       'left:50%;top:40%;width:50vw;height:auto;font-size:min(7vw,40px);max-width:300px;' +
       'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
       'transform:translate(-50%,-50%);');
-    el('tc-gameover', 'MENU',
+    el('tc-gameover', 'Menu',
       'left:50%;bottom:6vh;width:18vw;height:11vw;font-size:min(3.5vw,18px);max-width:100px;max-height:65px;transform:translateX(-50%);');
 
     // ── HUD bars ──
@@ -197,7 +348,23 @@
     document.getElementById('tc-hud-damage').style.cssText +=
       'left:50%;right:14vw;top:2vh;padding-left:1vw;';
 
-    // Wire up buttons
+    // ── Season overlay ──
+    var overlay = document.createElement('div');
+    overlay.id = 'season-overlay';
+    overlay.style.cssText =
+      'position:fixed;left:0;top:0;width:100%;height:100%;' +
+      'display:none;align-items:center;justify-content:center;' +
+      'pointer-events:auto;z-index:150;background:rgba(0,0,0,0.85);';
+    var card = document.createElement('div');
+    card.id = 'season-card';
+    card.style.cssText =
+      'background:rgba(20,20,40,0.95);color:#fff;border:2px solid rgba(255,255,255,0.3);' +
+      'border-radius:16px;padding:3vh 4vw;max-width:90vw;max-height:85vh;' +
+      'overflow-y:auto;font-family:Arial,sans-serif;text-align:center;' +
+      'box-sizing:border-box;min-width:min(80vw,360px);';
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
     wireButtons();
     wireKeyboard();
   }
@@ -224,261 +391,529 @@
     container.appendChild(row);
   }
 
-  // ── Button wiring ──────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  //  SEASON OVERLAY SCREENS
+  // ══════════════════════════════════════════════════════════════
 
-  function addBtn(id, callback) {
+  function showOverlay(html) {
+    document.getElementById('season-card').innerHTML = html;
+    document.getElementById('season-overlay').style.display = 'flex';
+  }
+
+  function hideOverlay() {
+    document.getElementById('season-overlay').style.display = 'none';
+  }
+
+  function btnCss() {
+    return 'display:inline-block;margin:1.5vh 1vw;padding:1.5vh 4vw;' +
+      'background:rgba(255,255,255,0.18);color:#fff;border:2px solid rgba(255,255,255,0.4);' +
+      'border-radius:12px;font-family:Arial,sans-serif;font-weight:bold;' +
+      'font-size:min(4vw,20px);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;';
+  }
+
+  function overlayBtn(id, label, handler) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', function () { handler(); });
+    el.addEventListener('touchstart', function (e) { e.preventDefault(); handler(); }, { passive: false });
+  }
+
+  // ── Pre-race screen ──
+  function showPreRace() {
+    var race = season.schedule[season.currentRace];
+    if (!race.isHumanRace) {
+      resolveComputerRace(race);
+      showRaceResult(race);
+      return;
+    }
+    uiMode = UI_SEASON_PRE_RACE;
+    var h = '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:1vh;">' +
+      divLabel(season.humanDiv) + ' \u2014 Race ' + (season.currentRace + 1) + ' of 6</div>';
+    h += '<div style="font-size:min(5vw,28px);margin:2vh 0;">' + TRACK_NAMES[race.trackIndex] + '</div>';
+    h += '<div style="font-size:min(6vw,32px);margin:2vh 0;">' +
+      driverName(race.driverA) + ' <span style="opacity:0.5;font-size:min(4vw,22px);">vs</span> ' +
+      driverName(race.driverB) + '</div>';
+    h += '<div id="s-btn-race" style="' + btnCss() + '">Race</div>';
+    h += '<div id="s-btn-quit" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Quit Season</div>';
+    showOverlay(h);
+
+    overlayBtn('s-btn-race', 'RACE', beginSeasonRace);
+    overlayBtn('s-btn-quit', 'QUIT', quitSeason);
+  }
+
+  function beginSeasonRace() {
+    var race = season.schedule[season.currentRace];
+    var oppId = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
+    hideOverlay();
+    fadeAndDo(function () {
+      selectTrack(race.trackIndex);
+      startGame(oppId);
+      uiMode = UI_SEASON_RACE;
+      showUIForMode();
+    });
+  }
+
+  function simComputerRace() {
+    var race = season.schedule[season.currentRace];
+    resolveComputerRace(race);
+    showRaceResult(race);
+  }
+
+  function showRaceResult(race) {
+    uiMode = UI_SEASON_RESULT;
+    var h = '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:1vh;">' +
+      'Race Result \u2014 ' + TRACK_NAMES[race.trackIndex] + '</div>';
+    h += '<div style="font-size:min(5vw,26px);margin:2vh 0;">' +
+      driverName(race.driverA) + ' vs ' + driverName(race.driverB) + '</div>';
+    h += '<div style="font-size:min(4vw,22px);margin:1vh 0;">' +
+      '\uD83C\uDFC6 Winner: <b>' + driverName(race.winnerDriver) + '</b> (+2 pts)</div>';
+    h += '<div style="font-size:min(3.5vw,18px);margin:1vh 0;">' +
+      '\u23F1\uFE0F Fastest Lap: <b>' + driverName(race.bestLapDriver) + '</b> (+1 pt)</div>';
+    if (race.playerBestLapMs > 0) {
+      h += '<div style="font-size:min(3vw,16px);opacity:0.6;margin:1vh 0;">Your best lap: ' +
+        fmtLap(race.playerBestLapMs) + '</div>';
+    }
+    h += '<div id="s-btn-cont" style="' + btnCss() + '">Continue</div>';
+    showOverlay(h);
+    overlayBtn('s-btn-cont', 'CONTINUE', advanceSeason);
+  }
+
+  function advanceSeason() {
+    season.currentRace++;
+    if (season.currentRace >= 6) {
+      showStandings();
+    } else {
+      showPreRace();
+    }
+  }
+
+  function showStandings() {
+    uiMode = UI_SEASON_STANDINGS;
+    var di = season.humanDiv;
+    var st = divStandings(di);
+
+    // Compute and save new division assignments
+    var na = season.divAssign.slice();
+    for (var d = 0; d < 3; d++) {
+      var sH = divStandings(d), sA = divStandings(d + 1);
+      na[sH[0]] = d + 1;
+      na[sA[sA.length - 1]] = d;
+    }
+    currentDivAssign = na;
+    humanDivision = na[HUMAN_PLAYER];
+
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">' + divLabel(di) + ' Standings</div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:min(3.5vw,18px);margin:1vh 0;">';
+    h += '<tr style="opacity:0.6;"><td style="text-align:left;padding:0.5vh 1vw;">#</td>' +
+      '<td style="text-align:left;padding:0.5vh 1vw;">Driver</td>' +
+      '<td style="text-align:center;padding:0.5vh 1vw;">W</td>' +
+      '<td style="text-align:center;padding:0.5vh 1vw;">FL</td>' +
+      '<td style="text-align:center;padding:0.5vh 1vw;">Pts</td></tr>';
+
+    for (var i = 0; i < st.length; i++) {
+      var d = st[i], p = season.points[d], pts = p.wins * 2 + p.bestLaps;
+      var isH = (d === HUMAN_PLAYER);
+      var badge = '';
+      if (i === 0 && di < 3)  badge = ' \u2B06\uFE0F';
+      if (i === 0 && di === 3) badge = ' \uD83C\uDFC6';
+      if (i === st.length - 1 && di > 0) badge = ' \u2B07\uFE0F';
+      h += '<tr style="' + (isH ? 'color:#ffdd44;' : '') + '">' +
+        '<td style="text-align:left;padding:0.5vh 1vw;">' + (i + 1) + '</td>' +
+        '<td style="text-align:left;padding:0.5vh 1vw;">' + driverName(d) + badge + '</td>' +
+        '<td style="text-align:center;padding:0.5vh 1vw;">' + p.wins + '</td>' +
+        '<td style="text-align:center;padding:0.5vh 1vw;">' + p.bestLaps + '</td>' +
+        '<td style="text-align:center;padding:0.5vh 1vw;font-weight:bold;">' + pts + '</td></tr>';
+    }
+    h += '</table>';
+
+    var top = st[0], bot = st[st.length - 1];
+    if (top === HUMAN_PLAYER) {
+      if (di === 3) h += '<div style="font-size:min(5vw,26px);margin:2vh 0;color:#ffd700;">' +
+        '\uD83C\uDFC6 SUPER LEAGUE CHAMPION! \uD83C\uDFC6</div>';
+      else h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#44ff44;">' +
+        '\u2B06\uFE0F Promoted to ' + divLabel(di + 1) + '!</div>';
+    } else if (bot === HUMAN_PLAYER) {
+      if (di === 0) h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#ff8844;">' +
+        'Bottom of the league \u2014 try again!</div>';
+      else h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#ff4444;">' +
+        '\u2B07\uFE0F Relegated to ' + divLabel(di - 1) + '</div>';
+    } else {
+      h += '<div style="font-size:min(3.5vw,18px);margin:2vh 0;opacity:0.7;">' +
+        'Staying in ' + divLabel(di) + '</div>';
+    }
+
+    h += '<div id="s-btn-next" style="' + btnCss() + '">Finish Season</div>';
+    showOverlay(h);
+    overlayBtn('s-btn-next', 'FINISH', finishSeason);
+  }
+
+  function finishSeason() {
+    season = null;
+    hideOverlay();
+    goToMenu();
+    uiMode = UI_MAIN_MENU;
+    showUIForMode();
+  }
+
+  function finishSeasonRace() {
+    var race = season.schedule[season.currentRace];
+    var won = isRaceWon();
+    var wrecked = isPlayerWrecked();
+    var pBest = getPlayerBestLap();
+    var oBest = getOpponentBestLap();
+    var opponent = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
+
+    if (wrecked) {
+      race.winnerDriver = opponent;
+      race.bestLapDriver = opponent;
+    } else {
+      race.winnerDriver = won ? HUMAN_PLAYER : opponent;
+      if (pBest > 0 && oBest > 0)
+        race.bestLapDriver = (pBest <= oBest) ? HUMAN_PLAYER : opponent;
+      else if (pBest > 0)
+        race.bestLapDriver = HUMAN_PLAYER;
+      else
+        race.bestLapDriver = opponent;
+    }
+
+    race.playerBestLapMs = pBest;
+    race.played = true;
+    season.points[race.winnerDriver].wins++;
+    season.points[race.bestLapDriver].bestLaps++;
+
+    fadeAndDo(function () {
+      goToMenu();
+      showRaceResult(race);
+    });
+  }
+
+  function quitSeason() {
+    season = null;
+    hideOverlay();
+    goToMenu();
+    uiMode = UI_MAIN_MENU;
+    showUIForMode();
+  }
+
+  // ── Main menu screen ──
+  function showMainMenu() {
+    var h = '<div style="font-size:min(6vw,32px);margin-bottom:1vh;">STUNT CAR RACER</div>';
+    h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:3vh;">' + divLabel(humanDivision) + '</div>';
+    h += '<div id="mm-btn-practise" style="' + btnCss() + '">Practise</div><br>';
+    h += '<div id="mm-btn-season" style="' + btnCss() + '">Start the Racing Season</div>';
+    showOverlay(h);
+    overlayBtn('mm-btn-practise', 'PRACTISE', function () {
+      hideOverlay();
+      fadeAndDo(function () { uiMode = UI_PRACTISE_MENU; showUIForMode(); });
+    });
+    overlayBtn('mm-btn-season', 'SEASON', function () {
+      hideOverlay();
+      fadeAndDo(function () {
+        season = createNewSeason(currentDivAssign.slice());
+        showPreRace();
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  BUTTON & KEYBOARD WIRING
+  // ══════════════════════════════════════════════════════════════
+
+  function handleMenuDuringRace() {
+    fadeAndDo(function () {
+      if (uiMode === UI_SEASON_RACE) {
+        var race = season.schedule[season.currentRace];
+        var opp = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
+        race.winnerDriver = opp;
+        race.bestLapDriver = opp;
+        race.played = true;
+        season.points[opp].wins++;
+        season.points[opp].bestLaps++;
+        goToMenu();
+        showRaceResult(race);
+      } else {
+        goToMenu();
+        uiMode = UI_MAIN_MENU;
+        showUIForMode();
+      }
+    });
+  }
+
+  function addBtn(id, cb) {
     var btn = document.getElementById(id);
-    function handler(e) {
+    function h(e) {
       e.preventDefault();
       btn.style.background = 'rgba(255,255,255,0.45)';
-      callback();
+      cb();
       setTimeout(function () { btn.style.background = 'rgba(255,255,255,0.18)'; }, 200);
     }
-    btn.addEventListener('touchstart', handler, { passive: false });
-    btn.addEventListener('mousedown', handler);
+    btn.addEventListener('touchstart', h, { passive: false });
+    btn.addEventListener('mousedown', h);
   }
 
   function addDriveBtn(id, field) {
     var btn = document.getElementById(id);
     btn.addEventListener('touchstart', function (e) {
-      e.preventDefault();
-      btn.style.background = 'rgba(255,255,255,0.45)';
-      touchDrive[field] = true;
-      updateDriveFlags();
+      e.preventDefault(); btn.style.background = 'rgba(255,255,255,0.45)';
+      touchDrive[field] = true; updateDriveFlags();
     }, { passive: false });
     btn.addEventListener('touchend', function (e) {
-      e.preventDefault();
-      btn.style.background = 'rgba(255,255,255,0.18)';
-      touchDrive[field] = false;
-      updateDriveFlags();
+      e.preventDefault(); btn.style.background = 'rgba(255,255,255,0.18)';
+      touchDrive[field] = false; updateDriveFlags();
     }, { passive: false });
     btn.addEventListener('touchcancel', function (e) {
-      e.preventDefault();
-      btn.style.background = 'rgba(255,255,255,0.18)';
-      touchDrive[field] = false;
-      updateDriveFlags();
+      e.preventDefault(); btn.style.background = 'rgba(255,255,255,0.18)';
+      touchDrive[field] = false; updateDriveFlags();
     }, { passive: false });
   }
 
   function updateDriveFlags() {
-    var d = touchDrive;
-    var flags = 0;
-    if (d.left)  flags |= KEY_LEFT;
-    if (d.right) flags |= KEY_RIGHT;
-    if (d.gas && d.boost)   flags |= KEY_ACCEL_BOOST;
-    else if (d.gas)         flags |= KEY_ACCEL_ONLY;
-    if (d.brake && d.boost) flags |= KEY_BRAKE_BOOST;
-    else if (d.brake)       flags |= KEY_HASH;
-    setDriveInput(flags);
+    var d = touchDrive, f = 0;
+    if (d.left)  f |= KEY_LEFT;
+    if (d.right) f |= KEY_RIGHT;
+    if (d.gas && d.boost)   f |= KEY_ACCEL_BOOST;
+    else if (d.gas)         f |= KEY_ACCEL_ONLY;
+    if (d.brake && d.boost) f |= KEY_BRAKE_BOOST;
+    else if (d.brake)       f |= KEY_HASH;
+    setDriveInput(f);
   }
 
   function wireButtons() {
-    // Track Menu
+    // Main Menu
+    addBtn('mm-practise', function () {
+      fadeAndDo(function () { uiMode = UI_PRACTISE_MENU; showUIForMode(); });
+    });
+    addBtn('mm-season', function () {
+      fadeAndDo(function () {
+        season = createNewSeason(INITIAL_DIVISIONS.slice());
+        showPreRace();
+      });
+    });
+
+    // Track Menu (practise)
     addBtn('tc-prev', prevTrack);
     addBtn('tc-next', nextTrack);
     addBtn('tc-select', function () {
       if (getTrackID() < 0) return;
-      fadeAndDo(function () { startPreview(); });
+      fadeAndDo(function () { startPreview(); uiMode = UI_PRACTISE_PREVIEW; showUIForMode(); });
+    });
+    addBtn('tc-backmain', function () {
+      fadeAndDo(function () { goToMenu(); uiMode = UI_MAIN_MENU; showUIForMode(); });
     });
 
-    // Track Preview
+    // Track Preview (practise)
     addBtn('tc-back', function () {
-      fadeAndDo(function () { goToMenu(); });
+      fadeAndDo(function () { goToMenu(); uiMode = UI_PRACTISE_MENU; showUIForMode(); });
     });
     addBtn('tc-start', function () {
-      fadeAndDo(function () { startGame(-1); });
+      fadeAndDo(function () { startGame(-2); uiMode = UI_PRACTISE_RACE; showUIForMode(); });
     });
 
-    // In-Game drive controls (touch only)
+    // In-Game drive
     addDriveBtn('tc-left', 'left');
     addDriveBtn('tc-right', 'right');
     addDriveBtn('tc-accel', 'gas');
     addDriveBtn('tc-brake', 'brake');
     addDriveBtn('tc-boost', 'boost');
 
-    // In-Game menu / close
-    addBtn('tc-menu', function () {
-      fadeAndDo(function () { goToMenu(); });
-    });
+    // Close / menu
+    addBtn('tc-menu', handleMenuDuringRace);
 
-    // Game Over
+    // Game Over (practise)
     addBtn('tc-gameover', function () {
-      fadeAndDo(function () { goToMenu(); });
+      fadeAndDo(function () { goToMenu(); uiMode = UI_PRACTISE_MENU; showUIForMode(); });
     });
   }
-
-  // ── Keyboard shortcuts ─────────────────────────────────────
 
   function wireKeyboard() {
     document.addEventListener('keydown', function (e) {
-      var mode = getGameMode();
+      // Season overlay: Enter/Space → primary button, Escape → quit
+      if (uiMode === UI_SEASON_PRE_RACE || uiMode === UI_SEASON_RESULT || uiMode === UI_SEASON_STANDINGS) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          var btns = document.querySelectorAll('#season-card div[id^="s-btn-"]');
+          if (btns.length > 0) btns[0].click();
+          return;
+        }
+        if (e.key === 'Escape') { e.preventDefault(); quitSeason(); return; }
+      }
 
-      if (mode === TRACK_MENU) {
-        if (e.key === 'ArrowLeft')  { e.preventDefault(); prevTrack(); }
+      if (uiMode === UI_MAIN_MENU) {
+        if (e.key === '1' || e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          var b = document.getElementById('mm-btn-practise');
+          if (b) b.click();
+        } else if (e.key === '2' || e.key === 's' || e.key === 'S' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          var b = document.getElementById('mm-btn-season');
+          if (b) b.click();
+        }
+        return;
+      }
+
+      if (uiMode === UI_PRACTISE_MENU) {
+        if (e.key === 'ArrowLeft')       { e.preventDefault(); prevTrack(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); nextTrack(); }
         else if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          if (getTrackID() >= 0) fadeAndDo(function () { startPreview(); });
-        }
-      }
-
-      else if (mode === TRACK_PREVIEW) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          fadeAndDo(function () { startGame(-1); });
+          if (getTrackID() >= 0) fadeAndDo(function () { startPreview(); uiMode = UI_PRACTISE_PREVIEW; showUIForMode(); });
         } else if (e.key === 'Backspace' || e.key === 'Escape') {
-          e.preventDefault();
-          fadeAndDo(function () { goToMenu(); });
+          e.preventDefault(); fadeAndDo(function () { goToMenu(); uiMode = UI_MAIN_MENU; showUIForMode(); });
         }
+        return;
       }
 
-      else if (mode === GAME_IN_PROGRESS) {
+      if (uiMode === UI_PRACTISE_PREVIEW) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault(); fadeAndDo(function () { startGame(-2); uiMode = UI_PRACTISE_RACE; showUIForMode(); });
+        } else if (e.key === 'Backspace' || e.key === 'Escape') {
+          e.preventDefault(); fadeAndDo(function () { goToMenu(); uiMode = UI_PRACTISE_MENU; showUIForMode(); });
+        }
+        return;
+      }
+
+      if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) {
         if (e.key === 'Backspace' || e.key === 'Escape') {
-          e.preventDefault();
-          fadeAndDo(function () { goToMenu(); });
+          e.preventDefault(); handleMenuDuringRace();
         }
+        return;
       }
 
-      else if (mode === GAME_OVER) {
+      if (uiMode === UI_PRACTISE_RESULT) {
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Backspace' || e.key === 'Escape') {
-          e.preventDefault();
-          fadeAndDo(function () { goToMenu(); });
+          e.preventDefault(); fadeAndDo(function () { goToMenu(); uiMode = UI_PRACTISE_MENU; showUIForMode(); });
         }
+        return;
       }
     });
   }
 
-  // ── Per-frame update ───────────────────────────────────────
-  // Called via requestAnimationFrame. Polls the C++ engine for
-  // the current state and updates all on-screen elements.
+  // ══════════════════════════════════════════════════════════════
+  //  UI VISIBILITY
+  // ══════════════════════════════════════════════════════════════
+
+  var ALL_ELS = [
+    'mm-practise', 'mm-season', 'mm-title',
+    'tc-prev', 'tc-next', 'tc-select', 'tc-trackname', 'tc-backmain',
+    'tc-back', 'tc-start',
+    'tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost',
+    'tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage',
+    'tc-gameover-label', 'tc-gameover'
+  ];
+
+  function hideAllUI() {
+    for (var i = 0; i < ALL_ELS.length; i++) {
+      var e = document.getElementById(ALL_ELS[i]);
+      if (e) e.style.display = 'none';
+    }
+    hideOverlay();
+  }
+
+  function showEls(ids) {
+    for (var i = 0; i < ids.length; i++) {
+      var e = document.getElementById(ids[i]);
+      if (e) e.style.display = 'flex';
+    }
+  }
+
+  function showUIForMode() {
+    hideAllUI();
+    switch (uiMode) {
+      case UI_MAIN_MENU:
+        showMainMenu(); break;
+      case UI_PRACTISE_MENU:
+        showEls(['tc-prev', 'tc-next', 'tc-select', 'tc-trackname', 'tc-backmain']); break;
+      case UI_PRACTISE_PREVIEW:
+        showEls(['tc-back', 'tc-start']); break;
+      case UI_PRACTISE_RACE:
+      case UI_SEASON_RACE:
+        showEls(['tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage']);
+        if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
+        break;
+      case UI_PRACTISE_RESULT:
+        showEls(['tc-gameover-label', 'tc-gameover']); break;
+      // Season overlays managed by showOverlay()
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  PER-FRAME UPDATE
+  // ══════════════════════════════════════════════════════════════
 
   function update() {
     if (!ready) { requestAnimationFrame(update); return; }
 
-    var mode = getGameMode();
+    var cppMode = getGameMode();
 
-    // ── Mode change → show/hide element groups ──
-    if (mode !== lastGameMode) {
-      lastGameMode = mode;
-      raceEndTime = 0;
-
-      var groups = {
-        menu:     ['tc-prev', 'tc-next', 'tc-select', 'tc-trackname'],
-        preview:  ['tc-back', 'tc-start', 'tc-opponent'],
-        drive:    ['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost'],
-        common:   ['tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage'],
-        gameover: ['tc-gameover-label', 'tc-gameover']
-      };
-
-      // Hide everything
-      var all = [].concat(groups.menu, groups.preview, groups.drive, groups.common, groups.gameover);
-      for (var i = 0; i < all.length; i++) {
-        var e = document.getElementById(all[i]);
-        if (e) e.style.display = 'none';
-      }
-
-      // Show the right group
-      var show = [];
-      if (mode === TRACK_MENU)           show = groups.menu;
-      else if (mode === TRACK_PREVIEW)   show = groups.preview;
-      else if (mode === GAME_IN_PROGRESS) {
-        show = groups.common.slice();
-        if (isMobile) show = show.concat(groups.drive);
-      }
-      else if (mode === GAME_OVER)       show = groups.gameover;
-
-      for (var i = 0; i < show.length; i++) {
-        var e = document.getElementById(show[i]);
-        if (e) e.style.display = 'flex';
-      }
-
-      // Game Over label
-      if (mode === GAME_OVER) {
-        var lbl = document.getElementById('tc-gameover-label');
-        if (lbl) {
-          lbl.textContent = isPlayerWrecked() ? 'WRECKED' : (isRaceWon() ? 'YOU WON' : 'YOU LOST');
-        }
-      }
-    }
-
-    // ── Track Menu: track name ──
-    if (mode === TRACK_MENU) {
+    // Track name in practise menu
+    if (uiMode === UI_PRACTISE_MENU) {
       var label = document.getElementById('tc-trackname');
       if (label) label.textContent = getTrackName();
     }
 
-    // ── Track Preview: opponent name ──
-    if (mode === TRACK_PREVIEW) {
-      var oppLabel = document.getElementById('tc-opponent');
-      if (oppLabel) {
-        var name = getOpponentName();
-        oppLabel.textContent = name ? 'vs ' + name : '';
-      }
-    }
-
-    // ── In-Game: race-finished flashing label + timer ──
-    if (mode === GAME_IN_PROGRESS && isRaceFinished()) {
-      // Start the 6-second timer on first detection
+    // Race-finished detection
+    if ((uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) &&
+        cppMode === GAME_IN_PROGRESS && isRaceFinished()) {
       if (raceEndTime === 0) raceEndTime = Date.now();
 
-      // Show flashing result label
       var lbl = document.getElementById('tc-gameover-label');
       if (lbl) {
-        lbl.textContent = isPlayerWrecked() ? 'WRECKED' : (isRaceWon() ? 'RACE WON' : 'RACE LOST');
+        if (uiMode === UI_SEASON_RACE)
+          lbl.textContent = isPlayerWrecked() ? 'WRECKED' : (isRaceWon() ? 'RACE WON' : 'RACE LOST');
+        else
+          lbl.textContent = isPlayerWrecked() ? 'WRECKED' : 'RACE COMPLETE';
         lbl.style.display = 'flex';
-        var flash = (Math.floor(Date.now() / 500) % 2 === 0);
-        lbl.style.opacity = flash ? '1' : '0.2';
+        lbl.style.opacity = (Math.floor(Date.now() / 500) % 2 === 0) ? '1' : '0.2';
       }
 
-      // After 6 seconds, transition to GAME_OVER
       if (Date.now() - raceEndTime > 6000) {
-        setGameOver();
-      }
-    }
-
-    // ── In-Game: lap counter ──
-    if (mode === GAME_IN_PROGRESS) {
-      var lapEl = document.getElementById('tc-lap');
-      if (lapEl) {
-        var lap = getLapNumber();
-        if (lap < 1) {
-          lapEl.style.display = 'none';
+        raceEndTime = 0;
+        if (uiMode === UI_SEASON_RACE) {
+          setGameOver();
+          finishSeasonRace();
         } else {
-          lapEl.style.display = 'flex';
-          lapEl.textContent = 'Lap ' + Math.min(lap, 3) + '/3';
+          setGameOver();
+          uiMode = UI_PRACTISE_RESULT;
+          var rl = document.getElementById('tc-gameover-label');
+          if (rl) { rl.textContent = isPlayerWrecked() ? 'WRECKED' : 'RACE COMPLETE'; rl.style.opacity = '1'; }
+          showUIForMode();
         }
       }
     }
 
-    // ── HUD bars (in-game + game over) ──
-    if (mode === GAME_IN_PROGRESS || mode === GAME_OVER) {
-      var boostFill = document.getElementById('tc-hud-boost-fill');
-      if (boostFill) {
-        var max = getBoostMax();
-        var pct = max > 0 ? Math.round(100 * getBoostReserve() / max) : 0;
-        boostFill.style.width = pct + '%';
+    // Lap counter
+    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) {
+      var lapEl = document.getElementById('tc-lap');
+      if (lapEl) {
+        var lap = getLapNumber();
+        if (lap < 1) lapEl.style.display = 'none';
+        else { lapEl.style.display = 'flex'; lapEl.textContent = 'Lap ' + Math.min(lap, 3) + '/3'; }
       }
-      var dmgFill = document.getElementById('tc-hud-damage-fill');
-      if (dmgFill) {
-        dmgFill.style.width = Math.min(100, Math.round(100 * getDamage() / 255)) + '%';
-      }
+    }
+
+    // HUD bars
+    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_PRACTISE_RESULT) {
+      var bf = document.getElementById('tc-hud-boost-fill');
+      if (bf) { var mx = getBoostMax(); bf.style.width = (mx > 0 ? Math.round(100 * getBoostReserve() / mx) : 0) + '%'; }
+      var df = document.getElementById('tc-hud-damage-fill');
+      if (df) df.style.width = Math.min(100, Math.round(100 * getDamage() / 255)) + '%';
     }
 
     requestAnimationFrame(update);
   }
 
-  // ── Bootstrap ──────────────────────────────────────────────
-  // Wait for the Emscripten runtime to be fully initialised,
-  // then create the UI and start the update loop.
+  // ══════════════════════════════════════════════════════════════
+  //  BOOTSTRAP
+  // ══════════════════════════════════════════════════════════════
 
   function boot() {
     createUI();
     ready = true;
+    uiMode = UI_MAIN_MENU;
+    showUIForMode();
     requestAnimationFrame(update);
   }
 
-  // Module.onRuntimeInitialized fires after wasm instantiation.
-  // If it already ran (e.g. script loaded late), call boot directly.
   if (typeof Module !== 'undefined' && Module.calledRun) {
     boot();
   } else {
