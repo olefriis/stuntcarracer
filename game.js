@@ -78,6 +78,7 @@
   var UI_PRACTISE_PREVIEW = 'practise_preview';
   var UI_PRACTISE_RACE   = 'practise_race';
   var UI_PRACTISE_RESULT = 'practise_result';
+  var UI_SEASON_OVERVIEW = 'season_overview';
   var UI_SEASON_PRE_RACE = 'season_pre_race';
   var UI_SEASON_RACE     = 'season_race';
   var UI_SEASON_RESULT   = 'season_result';
@@ -418,6 +419,45 @@
     el.addEventListener('touchstart', function (e) { e.preventDefault(); handler(); }, { passive: false });
   }
 
+  // ── Season overview screen ──
+  function showSeasonOverview() {
+    uiMode = UI_SEASON_OVERVIEW;
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Season Overview</div>';
+    h += '<div style="display:flex;gap:1vw;justify-content:center;align-items:stretch;margin:1vh 0;">';
+    // Show divisions from highest (Div 1 = index 3) to lowest (Div 4 = index 0)
+    for (var di = 3; di >= 0; di--) {
+      var players = season.divisions[di];
+      var tracks = DIVISION_TRACKS[di];
+      var isHumanDiv = (di === season.humanDiv);
+      h += '<div style="flex:1;background:rgba(255,255,255,' + (isHumanDiv ? '0.12' : '0.05') + ');' +
+        'border:1px solid rgba(255,255,255,' + (isHumanDiv ? '0.4' : '0.15') + ');' +
+        'border-radius:10px;padding:1.5vh 1vw;display:flex;flex-direction:column;">';
+      h += '<div style="font-size:min(3.5vw,17px);font-weight:bold;margin-bottom:1vh;' +
+        (isHumanDiv ? 'color:#ffdd44;' : '') + '">' + divLabel(di) + '</div>';
+      // Players
+      for (var p = 0; p < players.length; p++) {
+        var pid = players[p];
+        var isH = (pid === HUMAN_PLAYER);
+        h += '<div style="font-size:min(3vw,15px);padding:0.3vh 0;' +
+          (isH ? 'color:#ffdd44;font-weight:bold;' : 'opacity:0.8;') + '">' +
+          driverName(pid) + '</div>';
+      }
+      // Spacer
+      h += '<div style="flex:1;"></div>';
+      // Tracks
+      h += '<div style="margin-top:1.5vh;border-top:1px solid rgba(255,255,255,0.15);padding-top:1vh;">';
+      for (var t = 0; t < tracks.length; t++) {
+        h += '<div style="font-size:min(2.5vw,13px);opacity:0.6;padding:0.2vh 0;">' +
+          TRACK_NAMES[tracks[t]] + '</div>';
+      }
+      h += '</div></div>';
+    }
+    h += '</div>';
+    h += '<div id="s-btn-go" style="' + btnCss() + 'margin-top:2vh;">Continue</div>';
+    showOverlay(h);
+    overlayBtn('s-btn-go', 'GO', function () { showPreRace(); });
+  }
+
   // ── Pre-race screen ──
   function showPreRace() {
     var race = season.schedule[season.currentRace];
@@ -610,7 +650,7 @@
       hideOverlay();
       fadeAndDo(function () {
         season = createNewSeason(currentDivAssign.slice());
-        showPreRace();
+        showSeasonOverview();
       });
     });
   }
@@ -728,7 +768,7 @@
   function wireKeyboard() {
     document.addEventListener('keydown', function (e) {
       // Season overlay: Enter/Space → primary button, Escape → quit
-      if (uiMode === UI_SEASON_PRE_RACE || uiMode === UI_SEASON_RESULT || uiMode === UI_SEASON_STANDINGS) {
+      if (uiMode === UI_SEASON_OVERVIEW || uiMode === UI_SEASON_PRE_RACE || uiMode === UI_SEASON_RESULT || uiMode === UI_SEASON_STANDINGS) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           var btns = document.querySelectorAll('#season-card div[id^="s-btn-"]');
