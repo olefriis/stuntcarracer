@@ -1759,6 +1759,7 @@ void jsStartGame(int opponentId) {
         }
     }
     bNewGame = TRUE;
+    ResetPlayer();
     GameMode = GAME_IN_PROGRESS;
     ResetLapData(OPPONENT);
     ResetLapData(PLAYER);
