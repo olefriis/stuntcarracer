@@ -83,11 +83,25 @@
   var UI_SEASON_RACE     = 'season_race';
   var UI_SEASON_RESULT   = 'season_result';
   var UI_SEASON_STANDINGS = 'season_standings';
+  var UI_MP_ROLE_SELECT  = 'mp_role_select';
+  var UI_MP_HOST_LOBBY   = 'mp_host_lobby';
+  var UI_MP_HOST_TRACK   = 'mp_host_track';
+  var UI_MP_JOIN          = 'mp_join';
+  var UI_MP_JOIN_LOBBY    = 'mp_join_lobby';
+  var UI_MP_RACE          = 'mp_race';
+  var UI_MP_RESULT        = 'mp_result';
 
   var uiMode = UI_MAIN_MENU;
 
   // Touch drive state (mobile only)
   var touchDrive = { left: false, right: false, gas: false, brake: false, boost: false };
+
+  // ── Multiplayer state ──────────────────────────────────────
+  var DEFAULT_SIGNALING_URL = 'http://' + window.location.hostname + ':9292';
+  var signalingUrl = localStorage.getItem('scr_signaling_url') || DEFAULT_SIGNALING_URL;
+  var mpConnected = false;
+  var mpTrackIndex = 0;
+  var mpOpponentFinished = false;
 
   // ── Season state ───────────────────────────────────────────
   var season = null;
@@ -198,6 +212,21 @@
   function getLapNumber()      { return Module._jsGetLapNumber(); }
   function getPlayerBestLap()  { return Module._jsGetPlayerBestLap(); }
   function getOpponentBestLap(){ return Module._jsGetOpponentBestLap(); }
+
+  // Two-player C++ API
+  function setTwoPlayerMode(on)      { Module._jsSetTwoPlayerMode(on ? 1 : 0); }
+  function setTwoPlayerSide(side)    { Module._jsSetTwoPlayerSide(side); }
+  function getPlayerRoadSection()    { return Module._jsGetPlayerRoadSection(); }
+  function getPlayerDistIntoSection(){ return Module._jsGetPlayerDistanceIntoSection(); }
+  function getPlayerRoadXPosition()  { return Module._jsGetPlayerRoadXPosition(); }
+  function getPlayerZSpeed()         { return Module._jsGetPlayerZSpeed(); }
+  function getPlayerDamage()         { return Module._jsGetPlayerDamage(); }
+  function getPlayerWheelFL()        { return Module._jsGetPlayerWheelFL(); }
+  function getPlayerWheelFR()        { return Module._jsGetPlayerWheelFR(); }
+  function getPlayerWheelR()         { return Module._jsGetPlayerWheelR(); }
+  function setOpponentState(rs, dist, xPos, zSpd, wFL, wFR, wR) {
+    Module._jsSetOpponentState(rs, dist, xPos, zSpd, wFL, wFR, wR);
+  }
 
   function getTrackName() {
     var ptr = Module._jsGetTrackName();
@@ -335,7 +364,7 @@
 
     // ── Game Over / result label ──
     el('tc-gameover-label', '',
-      'left:50%;top:40%;width:50vw;height:auto;font-size:min(7vw,40px);max-width:300px;' +
+      'left:50%;top:40%;width:80vw;height:auto;font-size:min(7vw,40px);max-width:500px;' +
       'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
       'transform:translate(-50%,-50%);');
     el('tc-gameover', 'Menu',
@@ -635,12 +664,343 @@
     showUIForMode();
   }
 
+  // ══════════════════════════════════════════════════════════════
+  //  MULTIPLAYER
+  // ══════════════════════════════════════════════════════════════
+
+  // ── Per-frame state exchange ───────────────────────────────
+  // Packet: 7 × Int32 = 28 bytes
+  //   [0] road section, [1] distance into section, [2] road X position,
+  //   [3] z speed, [4] wheel FL, [5] wheel FR, [6] wheel R
+
+  function mpSendState() {
+    if (!SCR_Multiplayer.isConnected()) return;
+    var buf = new ArrayBuffer(28);
+    var view = new Int32Array(buf);
+    view[0] = getPlayerRoadSection();
+    view[1] = getPlayerDistIntoSection();
+    view[2] = getPlayerRoadXPosition();
+    view[3] = getPlayerZSpeed();
+    view[4] = getPlayerWheelFL();
+    view[5] = getPlayerWheelFR();
+    view[6] = getPlayerWheelR();
+    SCR_Multiplayer.send(buf);
+  }
+
+  function mpReceiveState(data) {
+    if (!(data instanceof ArrayBuffer) || data.byteLength < 28) return;
+    var view = new Int32Array(data);
+    setOpponentState(view[0], view[1], view[2], view[3], view[4], view[5], view[6]);
+  }
+
+  function mpSetupCallbacks() {
+    SCR_Multiplayer.onMessage = mpReceiveState;
+    SCR_Multiplayer.onReliableMessage = function (msg) {
+      if (msg.type === 'track' && !SCR_Multiplayer.isHost()) {
+        // Host selected a track
+        mpTrackIndex = msg.trackIndex;
+        selectTrack(mpTrackIndex);
+        // Start the race
+        hideOverlay();
+        fadeAndDo(function () {
+          setTwoPlayerMode(true);
+          setTwoPlayerSide(1);  // joiner on right
+          startGame(-2);
+          uiMode = UI_MP_RACE;
+          showUIForMode();
+        });
+      } else if (msg.type === 'finished') {
+        mpOpponentFinished = true;
+      } else if (msg.type === 'quit') {
+        // Opponent explicitly quit — trigger the same disconnect handling
+        mpConnected = false;
+        if (uiMode === UI_MP_RACE) {
+          var lbl = document.getElementById('tc-gameover-label');
+          if (lbl) { lbl.textContent = 'OPPONENT QUIT'; lbl.style.display = 'flex'; lbl.style.opacity = '1'; }
+          setTimeout(function () {
+            setGameOver();
+            mpCleanup();
+            goToMenu();
+            uiMode = UI_MAIN_MENU;
+            showUIForMode();
+          }, 3000);
+        }
+      }
+    };
+    SCR_Multiplayer.onClose = function () {
+      mpConnected = false;
+      if (uiMode === UI_MP_RACE) {
+        // Show "Opponent quit" message and end the race after a short delay
+        var lbl = document.getElementById('tc-gameover-label');
+        if (lbl) { lbl.textContent = 'OPPONENT QUIT'; lbl.style.display = 'flex'; lbl.style.opacity = '1'; }
+        setTimeout(function () {
+          setGameOver();
+          mpCleanup();
+          goToMenu();
+          uiMode = UI_MAIN_MENU;
+          showUIForMode();
+        }, 3000);
+      } else {
+        // Back to main menu
+        setTwoPlayerMode(false);
+        goToMenu();
+        uiMode = UI_MAIN_MENU;
+        showUIForMode();
+      }
+    };
+  }
+
+  function mpCleanup() {
+    SCR_Multiplayer.cleanup();
+    mpConnected = false;
+    mpOpponentFinished = false;
+    setTwoPlayerMode(false);
+  }
+
+  // ── Multiplayer UI screens ─────────────────────────────────
+
+  function showMpRoleSelect() {
+    uiMode = UI_MP_ROLE_SELECT;
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Two Players</div>';
+    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">' +
+      'Connect via WebRTC peer-to-peer</div>';
+    h += '<div style="font-size:min(2.5vw,13px);opacity:0.5;margin-bottom:0.5vh;">Signaling server</div>';
+    h += '<input id="mp-sig-url" type="text" value="' + signalingUrl.replace(/"/g, '&quot;') + '" ' +
+      'style="font-size:min(3vw,15px);text-align:center;width:min(70vw,340px);' +
+      'padding:0.8vh 1.5vw;border:1px solid rgba(255,255,255,0.3);border-radius:8px;' +
+      'background:rgba(255,255,255,0.08);color:#fff;font-family:monospace;outline:none;' +
+      'margin-bottom:2vh;" />';
+    h += '<div id="mp-btn-host" style="' + btnCss() + '">Host Game</div><br>';
+    h += '<div id="mp-btn-join" style="' + btnCss() + '">Join Game</div><br>';
+    h += '<div id="mp-btn-back" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Back</div>';
+    showOverlay(h);
+
+    function saveSignalingUrl() {
+      var inp = document.getElementById('mp-sig-url');
+      if (inp) {
+        signalingUrl = inp.value.replace(/\/+$/, '');
+        localStorage.setItem('scr_signaling_url', signalingUrl);
+      }
+    }
+
+    overlayBtn('mp-btn-host', 'HOST', function () { saveSignalingUrl(); startHosting(); });
+    overlayBtn('mp-btn-join', 'JOIN', function () { saveSignalingUrl(); showJoinScreen(); });
+    overlayBtn('mp-btn-back', 'BACK', function () {
+      hideOverlay();
+      uiMode = UI_MAIN_MENU;
+      showUIForMode();
+    });
+  }
+
+  function startHosting() {
+    uiMode = UI_MP_HOST_LOBBY;
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Hosting Game</div>';
+    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">Connecting to signaling server\u2026</div>';
+    h += '<div id="mp-host-code" style="font-size:min(10vw,60px);letter-spacing:0.3em;margin:2vh 0;"></div>';
+    h += '<div id="mp-host-status" style="font-size:min(3vw,16px);opacity:0.7;margin:1vh 0;">Setting up\u2026</div>';
+    h += '<div id="mp-btn-cancel" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Cancel</div>';
+    showOverlay(h);
+    overlayBtn('mp-btn-cancel', 'CANCEL', function () {
+      mpCleanup();
+      hideOverlay();
+      uiMode = UI_MAIN_MENU;
+      showUIForMode();
+    });
+
+    mpSetupCallbacks();
+
+    // Override onOpen to detect connection
+    var origReliableHandler = SCR_Multiplayer.onReliableMessage;
+    SCR_Multiplayer.onOpen = function () {
+      mpConnected = true;
+      SCR_Multiplayer.onReliableMessage = origReliableHandler;
+      // Go to track selection
+      showMpHostTrack();
+    };
+
+    SCR_Multiplayer.host(signalingUrl).then(function (code) {
+      var codeEl = document.getElementById('mp-host-code');
+      if (codeEl) codeEl.textContent = code;
+      var statusEl = document.getElementById('mp-host-status');
+      if (statusEl) statusEl.textContent = 'Share this code \u2014 waiting for opponent\u2026';
+    }).catch(function (err) {
+      var statusEl = document.getElementById('mp-host-status');
+      if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+    });
+  }
+
+  function showMpHostTrack() {
+    uiMode = UI_MP_HOST_TRACK;
+    mpTrackIndex = 0;
+    selectTrack(mpTrackIndex);
+    hideOverlay();
+    // Show track selection UI (reuse practise menu style but with different buttons)
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Select Track</div>';
+    h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:2vh;">Opponent connected!</div>';
+    h += '<div id="mp-track-name" style="font-size:min(5vw,26px);margin:2vh 0;">' +
+      TRACK_NAMES[mpTrackIndex] + '</div>';
+    h += '<div style="display:flex;justify-content:center;gap:2vw;">';
+    h += '<div id="mp-btn-prev" style="' + btnCss() + '">\u25C0\uFE0E</div>';
+    h += '<div id="mp-btn-next" style="' + btnCss() + '">\u25B6\uFE0E</div>';
+    h += '</div>';
+    h += '<div id="mp-btn-go" style="' + btnCss() + 'margin-top:2vh;">Start Race</div>';
+    h += '<div id="mp-btn-cancel2" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Cancel</div>';
+    showOverlay(h);
+    overlayBtn('mp-btn-prev', 'PREV', function () {
+      mpTrackIndex--;
+      if (mpTrackIndex < 0) mpTrackIndex = getNumTracks() - 1;
+      selectTrack(mpTrackIndex);
+      var el = document.getElementById('mp-track-name');
+      if (el) el.textContent = TRACK_NAMES[mpTrackIndex];
+    });
+    overlayBtn('mp-btn-next', 'NEXT', function () {
+      mpTrackIndex++;
+      if (mpTrackIndex >= getNumTracks()) mpTrackIndex = 0;
+      selectTrack(mpTrackIndex);
+      var el = document.getElementById('mp-track-name');
+      if (el) el.textContent = TRACK_NAMES[mpTrackIndex];
+    });
+    overlayBtn('mp-btn-go', 'GO', function () {
+      // Tell the joiner which track
+      SCR_Multiplayer.sendReliable({ type: 'track', trackIndex: mpTrackIndex });
+      // Start our own race
+      hideOverlay();
+      fadeAndDo(function () {
+        selectTrack(mpTrackIndex);
+        setTwoPlayerMode(true);
+        setTwoPlayerSide(0);  // host on left
+        startGame(-2);
+        uiMode = UI_MP_RACE;
+        mpOpponentFinished = false;
+        showUIForMode();
+      });
+    });
+    overlayBtn('mp-btn-cancel2', 'CANCEL', function () {
+      mpCleanup();
+      hideOverlay();
+      uiMode = UI_MAIN_MENU;
+      showUIForMode();
+    });
+  }
+
+  function showJoinScreen() {
+    uiMode = UI_MP_JOIN;
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Join Game</div>';
+    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">Enter the 4-letter code from the host</div>';
+    h += '<input id="mp-code-input" type="text" maxlength="4" autocapitalize="characters" ' +
+      'style="font-size:min(10vw,60px);text-align:center;letter-spacing:0.3em;width:min(60vw,300px);' +
+      'padding:1vh 2vw;border:2px solid rgba(255,255,255,0.4);border-radius:12px;' +
+      'background:rgba(255,255,255,0.1);color:#fff;font-family:monospace;outline:none;" />';
+    h += '<div id="mp-join-status" style="font-size:min(3vw,16px);opacity:0.7;margin:1vh 0;min-height:3vh;"></div>';
+    h += '<div id="mp-btn-connect" style="' + btnCss() + '">Connect</div>';
+    h += '<div id="mp-btn-jback" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Back</div>';
+    showOverlay(h);
+    // Focus input
+    setTimeout(function () {
+      var inp = document.getElementById('mp-code-input');
+      if (inp) inp.focus();
+    }, 100);
+    overlayBtn('mp-btn-connect', 'CONNECT', function () {
+      var code = (document.getElementById('mp-code-input').value || '').toUpperCase().trim();
+      if (code.length !== 4) {
+        document.getElementById('mp-join-status').textContent = 'Code must be 4 characters';
+        return;
+      }
+      joinGame(code);
+    });
+    overlayBtn('mp-btn-jback', 'BACK', function () {
+      hideOverlay();
+      showMpRoleSelect();
+    });
+    // Also allow Enter to connect
+    var inp = document.getElementById('mp-code-input');
+    if (inp) {
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var btn = document.getElementById('mp-btn-connect');
+          if (btn) btn.click();
+        }
+      });
+    }
+  }
+
+  function joinGame(code) {
+    uiMode = UI_MP_JOIN_LOBBY;
+    var statusEl = document.getElementById('mp-join-status');
+    if (statusEl) statusEl.textContent = 'Connecting\u2026';
+
+    mpSetupCallbacks();
+
+    SCR_Multiplayer.onOpen = function () {
+      mpConnected = true;
+      if (statusEl) statusEl.textContent = 'Connected! Waiting for host to select track\u2026';
+      // Disable the Connect button and gray out the code input
+      var btn = document.getElementById('mp-btn-connect');
+      if (btn) { btn.style.opacity = '0.3'; btn.style.pointerEvents = 'none'; }
+      var inp = document.getElementById('mp-code-input');
+      if (inp) { inp.disabled = true; inp.style.opacity = '0.3'; }
+    };
+
+    SCR_Multiplayer.join(signalingUrl, code).then(function () {
+      // Connected, waiting for track selection message via onReliableMessage
+    }).catch(function (err) {
+      if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+    });
+  }
+
+  function finishMpRace() {
+    // Notify opponent we finished
+    if (SCR_Multiplayer.isConnected()) {
+      SCR_Multiplayer.sendReliable({ type: 'finished' });
+    }
+    var won = isRaceWon();
+    var wrecked = isPlayerWrecked();
+    uiMode = UI_MP_RESULT;
+    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Race Complete</div>';
+    if (wrecked) {
+      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff4444;">WRECKED</div>';
+    } else if (won) {
+      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#44ff44;">\uD83C\uDFC6 YOU WIN!</div>';
+    } else {
+      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff8844;">YOU LOSE</div>';
+    }
+    var pBest = getPlayerBestLap();
+    if (pBest > 0) {
+      h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin:1vh 0;">Your best lap: ' + fmtLap(pBest) + '</div>';
+    }
+    h += '<div id="mp-btn-again" style="' + btnCss() + '">Play Again</div>';
+    h += '<div id="mp-btn-quit" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Quit</div>';
+    showOverlay(h);
+    overlayBtn('mp-btn-again', 'AGAIN', function () {
+      hideOverlay();
+      mpOpponentFinished = false;
+      if (SCR_Multiplayer.isHost()) {
+        showMpHostTrack();
+      } else {
+        // Show waiting screen
+        uiMode = UI_MP_JOIN_LOBBY;
+        var h2 = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Waiting</div>';
+        h2 += '<div style="font-size:min(3vw,16px);opacity:0.7;">Waiting for host to select next track\u2026</div>';
+        showOverlay(h2);
+      }
+    });
+    overlayBtn('mp-btn-quit', 'QUIT', function () {
+      mpCleanup();
+      hideOverlay();
+      goToMenu();
+      uiMode = UI_MAIN_MENU;
+      showUIForMode();
+    });
+  }
+
   // ── Main menu screen ──
   function showMainMenu() {
     var h = '<div style="font-size:min(6vw,32px);margin-bottom:1vh;">STUNT CAR RACER</div>';
     h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:3vh;">' + divLabel(humanDivision) + '</div>';
     h += '<div id="mm-btn-practise" style="' + btnCss() + '">Practise</div><br>';
-    h += '<div id="mm-btn-season" style="' + btnCss() + '">Start the Racing Season</div>';
+    h += '<div id="mm-btn-season" style="' + btnCss() + '">Start the Racing Season</div><br>';
+    h += '<div id="mm-btn-twoplayer" style="' + btnCss() + '">Two Players</div>';
     showOverlay(h);
     overlayBtn('mm-btn-practise', 'PRACTISE', function () {
       hideOverlay();
@@ -653,6 +1013,10 @@
         showSeasonOverview();
       });
     });
+    overlayBtn('mm-btn-twoplayer', 'TWO PLAYERS', function () {
+      hideOverlay();
+      showMpRoleSelect();
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -661,7 +1025,17 @@
 
   function handleMenuDuringRace() {
     fadeAndDo(function () {
-      if (uiMode === UI_SEASON_RACE) {
+      if (uiMode === UI_MP_RACE) {
+        setGameOver();
+        // Notify opponent we're quitting
+        if (SCR_Multiplayer.isConnected()) {
+          try { SCR_Multiplayer.sendReliable({ type: 'quit' }); } catch(e) {}
+        }
+        mpCleanup();
+        goToMenu();
+        uiMode = UI_MAIN_MENU;
+        showUIForMode();
+      } else if (uiMode === UI_SEASON_RACE) {
         var race = season.schedule[season.currentRace];
         var opp = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
         race.winnerDriver = opp;
@@ -778,6 +1152,38 @@
         if (e.key === 'Escape') { e.preventDefault(); quitSeason(); return; }
       }
 
+      // Multiplayer overlays: Escape → back/cancel
+      if (uiMode === UI_MP_ROLE_SELECT || uiMode === UI_MP_HOST_LOBBY || uiMode === UI_MP_HOST_TRACK ||
+          uiMode === UI_MP_JOIN || uiMode === UI_MP_JOIN_LOBBY || uiMode === UI_MP_RESULT) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          mpCleanup();
+          hideOverlay();
+          goToMenu();
+          uiMode = UI_MAIN_MENU;
+          showUIForMode();
+          return;
+        }
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          var btns = document.querySelectorAll('#season-card div[id^="mp-btn-"]');
+          if (btns.length > 0) btns[0].click();
+          return;
+        }
+        if (uiMode === UI_MP_HOST_TRACK) {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            var b = document.getElementById('mp-btn-prev');
+            if (b) b.click();
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            var b = document.getElementById('mp-btn-next');
+            if (b) b.click();
+          }
+        }
+        return;
+      }
+
       if (uiMode === UI_MAIN_MENU) {
         if (e.key === '1' || e.key === 'p' || e.key === 'P') {
           e.preventDefault();
@@ -786,6 +1192,10 @@
         } else if (e.key === '2' || e.key === 's' || e.key === 'S' || e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           var b = document.getElementById('mm-btn-season');
+          if (b) b.click();
+        } else if (e.key === '3' || e.key === 'm' || e.key === 'M') {
+          e.preventDefault();
+          var b = document.getElementById('mm-btn-twoplayer');
           if (b) b.click();
         }
         return;
@@ -812,7 +1222,7 @@
         return;
       }
 
-      if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) {
+      if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) {
         if (e.key === 'Backspace' || e.key === 'Escape') {
           e.preventDefault(); handleMenuDuringRace();
         }
@@ -867,6 +1277,7 @@
         showEls(['tc-back', 'tc-start']); break;
       case UI_PRACTISE_RACE:
       case UI_SEASON_RACE:
+      case UI_MP_RACE:
         showEls(['tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage']);
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
         break;
@@ -892,13 +1303,13 @@
     }
 
     // Race-finished detection
-    if ((uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) &&
+    if ((uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) &&
         cppMode === GAME_IN_PROGRESS && isRaceFinished()) {
       if (raceEndTime === 0) raceEndTime = Date.now();
 
       var lbl = document.getElementById('tc-gameover-label');
       if (lbl) {
-        if (uiMode === UI_SEASON_RACE)
+        if (uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE)
           lbl.textContent = isPlayerWrecked() ? 'WRECKED' : (isRaceWon() ? 'RACE WON' : 'RACE LOST');
         else
           lbl.textContent = isPlayerWrecked() ? 'WRECKED' : 'RACE COMPLETE';
@@ -908,7 +1319,10 @@
 
       if (Date.now() - raceEndTime > 6000) {
         raceEndTime = 0;
-        if (uiMode === UI_SEASON_RACE) {
+        if (uiMode === UI_MP_RACE) {
+          setGameOver();
+          finishMpRace();
+        } else if (uiMode === UI_SEASON_RACE) {
           setGameOver();
           finishSeasonRace();
         } else {
@@ -922,7 +1336,7 @@
     }
 
     // Lap counter
-    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE) {
+    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) {
       var lapEl = document.getElementById('tc-lap');
       if (lapEl) {
         var lap = getLapNumber();
@@ -932,11 +1346,16 @@
     }
 
     // HUD bars
-    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_PRACTISE_RESULT) {
+    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE || uiMode === UI_PRACTISE_RESULT) {
       var bf = document.getElementById('tc-hud-boost-fill');
       if (bf) { var mx = getBoostMax(); bf.style.width = (mx > 0 ? Math.round(100 * getBoostReserve() / mx) : 0) + '%'; }
       var df = document.getElementById('tc-hud-damage-fill');
       if (df) df.style.width = Math.min(100, Math.round(100 * getDamage() / 255)) + '%';
+    }
+
+    // ── Multiplayer per-frame state exchange ──
+    if (uiMode === UI_MP_RACE && mpConnected) {
+      mpSendState();
     }
 
     requestAnimationFrame(update);

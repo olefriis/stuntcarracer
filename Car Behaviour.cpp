@@ -3608,8 +3608,17 @@ static void PositionCarAbovePiece (long piece)
 	 */
 	short sin_y, cos_y;
 	GetSinCos(player_y_angle, &sin_y, &cos_y);
-	player_x += (160 * (long)cos_y);
-	player_z -= (160 * (long)sin_y);
+
+	// Lateral offset: shift player to the side of the road.
+	// In two-player mode, host (side 0) goes further left, joiner (side 1) goes right.
+	extern bool twoPlayerMode;
+	extern long twoPlayerSide;
+	long lateral = 160;
+	if (twoPlayerMode) {
+		lateral = (twoPlayerSide == 0) ? 260 : 60;
+	}
+	player_x += (lateral * (long)cos_y);
+	player_z -= (lateral * (long)sin_y);
 }
 
 
@@ -4421,3 +4430,12 @@ void CloseAmigaRecording( void )
 	}
 }
 #endif
+
+// ── Two-player mode: expose static wheel heights ──
+
+void GetPlayerWheelHeights(long *fl, long *fr, long *r)
+{
+	*fl = front_left_actual_height;
+	*fr = front_right_actual_height;
+	*r = rear_actual_height;
+}

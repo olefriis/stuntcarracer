@@ -77,8 +77,15 @@ extern long INITIALISE_PLAYER;
 extern bool raceFinished, raceWon;
 extern long lapNumber[];
 extern double bestLapTime[];
+extern long player_current_piece;
+extern long players_distance_into_section;
+extern long players_road_x_position;
+extern long player_z_speed;
+extern long new_damage;
 bool playerWrecked = false;
 bool soloMode = false;
+bool twoPlayerMode = false;
+long twoPlayerSide = 0;  // 0 = left (host), 1 = right (joiner)
 
 
 //-----------------------------------------------------------------------------
@@ -1082,7 +1089,15 @@ D3DXMATRIX matRot, matTemp, matTrans, matView;
 							 &player1_y_angle,
 							 &player1_z_angle);
 
-			OpponentBehaviour(&opponent_x,
+			if (twoPlayerMode)
+				OpponentBehaviourTwoPlayer(&opponent_x,
+							  &opponent_y,
+							  &opponent_z,
+							  &opponent_x_angle,
+							  &opponent_y_angle,
+							  &opponent_z_angle);
+			else
+				OpponentBehaviour(&opponent_x,
 							  &opponent_y,
 							  &opponent_z,
 							  &opponent_x_angle,
@@ -1399,7 +1414,7 @@ HRESULT hr;
 		DrawTrack(pd3dDevice);
 
 		// Draw shadow with interpolated offset so it follows the smoothly-moving car
-		if (!soloMode)
+		if (!soloMode || twoPlayerMode)
 		{
 			D3DXMATRIX interpMtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
 			// Shadow vertices are stored at newMtx positions (the last game-logic frame).
@@ -1420,7 +1435,7 @@ HRESULT hr;
 				break;
 
 			case TRACK_PREVIEW:
-				if (!soloMode)
+				if (!soloMode || twoPlayerMode)
 				{
 				// Draw Opponent's Car
 					D3DMATRIX mtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
@@ -1431,7 +1446,7 @@ HRESULT hr;
 
 			case GAME_IN_PROGRESS:
 			case GAME_OVER:
-				if (!soloMode)
+				if (!soloMode || twoPlayerMode)
 				{
 				// Draw Opponent's Car
 					D3DMATRIX mtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
@@ -1860,6 +1875,49 @@ int jsGetOpponentBestLap() { return (int)(bestLapTime[OPPONENT]); }
 // Is solo mode active?
 EMSCRIPTEN_KEEPALIVE
 int jsIsSoloMode() { return soloMode ? 1 : 0; }
+
+// ── Two-player mode API ──
+
+// Enable/disable two-player mode
+EMSCRIPTEN_KEEPALIVE
+void jsSetTwoPlayerMode(int enabled) { twoPlayerMode = (enabled != 0); }
+
+// Set which side the player starts on: 0 = left (host), 1 = right (joiner)
+EMSCRIPTEN_KEEPALIVE
+void jsSetTwoPlayerSide(int side) { twoPlayerSide = side; }
+
+// Get player state for sending over network (7 longs packed into an int array)
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerRoadSection() { return (int)player_current_piece; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerDistanceIntoSection() { return (int)players_distance_into_section; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerRoadXPosition() { return (int)players_road_x_position; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerZSpeed() { return (int)player_z_speed; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerDamage() { return (int)new_damage; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerWheelFL() { long fl, fr, r; GetPlayerWheelHeights(&fl, &fr, &r); return (int)fl; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerWheelFR() { long fl, fr, r; GetPlayerWheelHeights(&fl, &fr, &r); return (int)fr; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetPlayerWheelR() { long fl, fr, r; GetPlayerWheelHeights(&fl, &fr, &r); return (int)r; }
+
+// Set opponent state from network data
+EMSCRIPTEN_KEEPALIVE
+void jsSetOpponentState(int roadSection, int distIntoSection, int roadXPos,
+                        int zSpeed, int playerFL, int playerFR, int playerR) {
+    SetOpponentNetworkState(roadSection, distIntoSection, roadXPos,
+                            zSpeed, playerFL, playerFR, playerR);
+}
 
 } // extern "C"
 

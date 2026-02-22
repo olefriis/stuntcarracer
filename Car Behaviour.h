@@ -63,6 +63,8 @@ extern void UpdateDamage (void);
 extern void ResetLapData (long car);
 extern void UpdateLapData (void);
 
+extern void GetPlayerWheelHeights (long *fl, long *fr, long *r);
+
 #ifdef USE_AMIGA_RECORDING
 extern void RequestGameReplay (void);
 extern void RequestStoredReplay (void);

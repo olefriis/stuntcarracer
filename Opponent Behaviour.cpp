@@ -2184,3 +2184,132 @@ long CalculateOpponentsDistance (void)
 
 	return(dist);
 	}
+
+/*	======================================================================================= */
+/*	Two-player mode support functions                                                       */
+/*	======================================================================================= */
+
+// Set opponent state from network data (called instead of OpponentMovement in two-player mode)
+// Input values are in the PLAYER's coordinate system and must be converted to the opponent system.
+//
+// Coordinate conversions (matching the original Amiga serial-link protocol):
+//   X position:  player uses 0-384 range (ROAD_WIDTH), opponent uses 0-256.
+//                Scale by 2/3  (Amiga: d0 * 21845 * 2 >> 16).
+//   Wheel heights: player has front-left, front-right, rear  (scale: world_y >> 8 ≈ sy*4).
+//                  opponent has rear-left, rear-right, front  (scale: sy/2, i.e. player/8).
+//                  Reshuffle: opp_front = avg(FL,FR), opp_RL = R - halfDiff, opp_RR = R + halfDiff
+//                  Then divide by 8  (>> 3).
+void SetOpponentNetworkState(long roadSection, long distIntoSection, long roadXPos,
+                             long zSpeed, long playerFL, long playerFR, long playerR)
+{
+	opponents_current_piece = roadSection;
+	opponents_distance_into_section = distIntoSection;
+
+	// Convert X position from player scale (0-384) to opponent scale (0-256)
+	opponents_road_x_position = (roadXPos * 2) / 3;
+
+	opponents_z_speed = zSpeed;
+
+	// Convert wheel heights: reshuffle from player arrangement (FL,FR,R)
+	// to opponent arrangement (RL,RR,F) and scale down by 8
+	long half_diff = (playerFR - playerFL) / 2;
+	opp_actual_height[FRONT]      = ((playerFL + playerFR) / 2) >> 3;
+	opp_actual_height[REAR_LEFT]  = (playerR - half_diff) >> 3;
+	opp_actual_height[REAR_RIGHT] = (playerR + half_diff) >> 3;
+}
+
+// Get opponent road state (for the two-player host to read AI-driven opponent if needed)
+void GetOpponentState(long *roadSection, long *distIntoSection, long *roadXPos,
+                      long *zSpeed, long *wheelRL, long *wheelRR, long *wheelF)
+{
+	*roadSection = opponents_current_piece;
+	*distIntoSection = opponents_distance_into_section;
+	*roadXPos = opponents_road_x_position;
+	*zSpeed = opponents_z_speed;
+	*wheelRL = opp_actual_height[REAR_LEFT];
+	*wheelRR = opp_actual_height[REAR_RIGHT];
+	*wheelF = opp_actual_height[FRONT];
+}
+
+// Two-player variant of OpponentBehaviour: uses network data instead of AI
+void OpponentBehaviourTwoPlayer(long *x, long *y, long *z,
+                                float *x_angle, float *y_angle, float *z_angle)
+{
+	long opponent_x, opponent_y, opponent_z;
+
+	// reset opponent on new game (same init as normal, but skip AI-specific setup)
+	if (bNewGame)
+	{
+		ResetOpponent();
+		opponents_current_piece = PlayersStartPiece;
+		opponents_distance_into_section = 0x400;
+		opponents_road_x_position = 0x4c;
+		CalculateOpponentsRoadWheelPositions();
+		int r = (rand() & 0x7f) + 0x68;
+		opp_actual_height[REAR_LEFT] = opp_rear_left_road_pos.y + r;
+		opp_actual_height[REAR_RIGHT] = opp_rear_right_road_pos.y + r;
+		opp_actual_height[FRONT] = opp_front_road_pos_y + r;
+		bNewGame = FALSE;
+	}
+
+	// Always calculate player's road position (needed for distance calculations)
+	CalculatePlayersRoadPosition();
+
+	// Skip OpponentMovement() — state was set by SetOpponentNetworkState()
+
+	// Still compute distances and interaction
+	CalculateDistancesBetweenPlayers();
+	OpponentPlayerInteraction();
+
+	// Compute opponent road wheel positions and 3D coordinates from the network-injected state
+	CalculateOpponentsRoadWheelPositions();
+
+	// opp_actual_height[] has been set by SetOpponentNetworkState() with properly
+	// converted values (player heights reshuffled and scaled to opponent coordinate system).
+	// Use max(road, actual) for each wheel so the car can jump above the road
+	// but never sink below it.
+
+	// Calculate opponent's world position (same as normal OpponentBehaviour)
+	opponent_x = (opp_front_left_road_pos.x + opp_front_right_road_pos.x +
+	              opp_rear_left_road_pos.x + opp_rear_right_road_pos.x) / 4;
+	opponent_x <<= LOG_PRECISION;
+
+	// Y position
+	long vis_rear_left_y = opp_rear_left_road_pos.y > opp_actual_height[REAR_LEFT] ?
+	                       opp_rear_left_road_pos.y : opp_actual_height[REAR_LEFT];
+	long vis_rear_right_y = opp_rear_right_road_pos.y > opp_actual_height[REAR_RIGHT] ?
+	                        opp_rear_right_road_pos.y : opp_actual_height[REAR_RIGHT];
+	long vis_front_y = opp_front_road_pos_y > opp_actual_height[FRONT] ?
+	                   opp_front_road_pos_y : opp_actual_height[FRONT];
+	long rear_y = (vis_rear_left_y + vis_rear_right_y) / 2;
+	opponent_y = (rear_y + vis_front_y) / 2;
+	opponent_y += 20;
+	opponent_y <<= (LOG_PRECISION-3);
+
+	opponent_z = (opp_front_left_road_pos.z + opp_front_right_road_pos.z +
+	              opp_rear_left_road_pos.z + opp_rear_right_road_pos.z) / 4;
+	opponent_z <<= LOG_PRECISION;
+
+	// Calculate angles (same as normal OpponentBehaviour)
+	double yd = (double)(rear_y - vis_front_y) / 2;
+	long rr_x = (opp_rear_left_road_pos.x + opp_rear_right_road_pos.x) / 2;
+	long rr_z = (opp_rear_left_road_pos.z + opp_rear_right_road_pos.z) / 2;
+	long fr_x = (opp_front_left_road_pos.x + opp_front_right_road_pos.x) / 2;
+	long fr_z = (opp_front_left_road_pos.z + opp_front_right_road_pos.z) / 2;
+	double xd = (double)(rr_x - fr_x);
+	double zd = (double)(rr_z - fr_z);
+	double carzd = sqrt((xd*xd) + (zd*zd));
+
+	*x = opponent_x;
+	*y = -(opponent_y * LOCAL_Y_FACTOR);
+	*z = opponent_z;
+	*x_angle = (float)atan2(yd, carzd);
+
+	xd = (double)(opp_rear_left_road_pos.x - opp_rear_right_road_pos.x);
+	zd = (double)(opp_rear_left_road_pos.z - opp_rear_right_road_pos.z);
+	*y_angle = (float)atan2(zd, -xd);
+
+	yd = (double)(vis_rear_left_y - vis_rear_right_y) / 2;
+	double carxd = sqrt((xd*xd) + (zd*zd));
+	*z_angle = (float)atan2(-yd, carxd);
+}
