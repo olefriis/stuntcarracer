@@ -8,6 +8,7 @@
  * Modes:
  *   MAIN_MENU  →  (Practise) TRACK_MENU → TRACK_PREVIEW → race → result → TRACK_MENU
  *              →  (Season)   season flow with schedule, results, standings
+ *              →  (Two Players) WebRTC multiplayer via signaling server
  */
 
 (function () {
@@ -97,15 +98,13 @@
   var touchDrive = { left: false, right: false, gas: false, brake: false, boost: false };
 
   // ── Multiplayer state ──────────────────────────────────────
-  var DEFAULT_SIGNALING_URL = 'https://stuntcarracer.fly.dev';
-  localStorage.removeItem('scr_signaling_url');  // clean up from older versions
-  var signalingUrl = DEFAULT_SIGNALING_URL;
+  var signalingUrl = 'https://stuntcarracer.fly.dev';
   var mpConnected = false;
   var mpTrackIndex = 0;
   var mpOpponentFinished = false;
   var mpOpponentWrecked = false;
-  var mpPlayerFinishedFirst = false;  // true if we sent 'finished' before receiving opponent's
-  var mpPlayerNotified = false;       // true once we've sent our 'finished' message
+  var mpPlayerFinishedFirst = false;
+  var mpPlayerNotified = false;
 
   // ── Season state ───────────────────────────────────────────
   var season = null;
@@ -249,12 +248,12 @@
   function fadeAndDo(callback) {
     if (fading) return;
     fading = true;
-    var el = document.getElementById('fadeOverlay');
-    el.style.opacity = '1';
+    var element = document.getElementById('fadeOverlay');
+    element.style.opacity = '1';
     setTimeout(function () {
       callback();
       setTimeout(function () {
-        el.style.opacity = '0';
+        element.style.opacity = '0';
         fading = false;
       }, 60);
     }, 350);
@@ -281,121 +280,67 @@
   function createUI() {
     isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-    // Fade overlay
+    // Fade overlay (styled via #fadeOverlay in game.css)
     var fade = document.createElement('div');
     fade.id = 'fadeOverlay';
-    fade.style.cssText =
-      'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;' +
-      'opacity:0;pointer-events:none;z-index:200;transition:opacity 0.35s ease;';
     document.body.appendChild(fade);
 
-    // Container for all game UI
+    // Container for all game UI (styled via #gameUI in game.css)
     var container = document.createElement('div');
     container.id = 'gameUI';
-    container.style.cssText =
-      'position:fixed;left:0;top:0;width:100%;height:100%;' +
-      'pointer-events:none;z-index:100;user-select:none;-webkit-user-select:none;';
     document.body.appendChild(container);
 
-    function el(id, text, css) {
+    // Helper: create a game button with the .game-button base class.
+    // All positioning is handled by ID selectors in game.css.
+    function element(id, text) {
       var d = document.createElement('div');
       d.id = id;
+      d.className = 'game-button';
       if (text) d.textContent = text;
-      d.style.cssText =
-        'position:absolute;pointer-events:auto;display:none;' +
-        'background:rgba(255,255,255,0.18);color:#fff;' +
-        'border:2px solid rgba(255,255,255,0.4);border-radius:12px;' +
-        'font-family:Arial,sans-serif;font-weight:bold;' +
-        'display:flex;align-items:center;justify-content:center;' +
-        'touch-action:none;user-select:none;-webkit-user-select:none;' +
-        'box-sizing:border-box;text-align:center;overflow:hidden;white-space:nowrap;' +
-        'cursor:pointer;' + (css || '');
-      d.style.display = 'none';
       container.appendChild(d);
       return d;
     }
 
     // ── Main Menu ──
-    el('mm-title', 'STUNT CAR RACER',
-      'left:50%;top:18%;width:70vw;height:auto;max-width:400px;font-size:min(6vw,32px);' +
-      'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
-      'transform:translateX(-50%);');
-    el('mm-practise', 'Practise',
-      'left:50%;top:40%;width:50vw;height:14vw;max-width:280px;max-height:70px;' +
-      'font-size:min(5vw,26px);transform:translateX(-50%);');
-    el('mm-season', 'Start the Racing Season',
-      'left:50%;top:calc(40% + 16vw);width:50vw;height:14vw;max-width:280px;max-height:70px;' +
-      'font-size:min(5vw,26px);transform:translateX(-50%);');
+    element('mm-title', 'STUNT CAR RACER');
+    element('mm-practise', 'Practise');
+    element('mm-season', 'Start the Racing Season');
 
     // ── Track Menu (practise) ──
-    el('tc-prev', '\u25C0\uFE0E',
-      'left:2vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
-    el('tc-next', '\u25B6\uFE0E',
-      'left:18vw;bottom:6vh;width:14vw;height:14vw;font-size:min(6vw,32px);max-width:75px;max-height:75px;');
-    el('tc-select', 'Select',
-      'right:2vw;bottom:6vh;width:22vw;height:14vw;font-size:min(3.5vw,18px);max-width:130px;max-height:75px;');
-    el('tc-trackname', '',
-      'left:34vw;right:26vw;width:auto;bottom:6vh;height:14vw;max-height:75px;font-size:min(3.8vw,20px);' +
-      'pointer-events:none;background:none;border:none;text-shadow:0 0 8px rgba(0,0,0,0.8);');
-    el('tc-backmain', 'Menu',
-      'left:2vw;top:2vh;width:18vw;height:10vw;font-size:min(3.5vw,18px);max-width:100px;max-height:55px;');
+    element('tc-prev', '\u25C0\uFE0E');
+    element('tc-next', '\u25B6\uFE0E');
+    element('tc-select', 'Select');
+    element('tc-trackname', '');
+    element('tc-backmain', 'Menu');
 
     // ── Track Preview (practise) ──
-    el('tc-back', 'Back',
-      'left:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
-    el('tc-start', 'Start',
-      'right:2vw;bottom:6vh;width:22vw;height:12vw;font-size:min(4.5vw,22px);max-width:120px;max-height:70px;');
+    element('tc-back', 'Back');
+    element('tc-start', 'Start');
 
     // ── In-Game driving controls (mobile only) ──
-    el('tc-left', '\u25C0\uFE0E',
-      'left:2vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
-    el('tc-right', '\u25B6\uFE0E',
-      'left:15vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
-    el('tc-accel', '\u25B2\uFE0E',
-      'right:2vw;bottom:30vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
-    el('tc-brake', '\u25BC\uFE0E',
-      'right:2vw;bottom:6vh;width:11vw;height:11vw;font-size:min(5vw,28px);max-width:65px;max-height:65px;');
-    el('tc-boost', '\u00A0\uD83D\uDD25\u00A0',
-      'left:50%;bottom:6vh;width:22vw;height:11vw;font-size:min(5vw,28px);max-width:120px;max-height:65px;transform:translateX(-50%);');
+    element('tc-left', '\u25C0\uFE0E');
+    element('tc-right', '\u25B6\uFE0E');
+    element('tc-accel', '\u25B2\uFE0E');
+    element('tc-brake', '\u25BC\uFE0E');
+    element('tc-boost', '\u00A0\uD83D\uDD25\u00A0');
 
     // ── In-Game common ──
-    el('tc-menu', '\u2715',
-      'right:2vw;top:2vh;width:10vw;height:10vw;font-size:min(5vw,28px);max-width:55px;max-height:55px;');
-    el('tc-lap', '',
-      'right:2vw;top:calc(2vh + 10vw + 1vh);width:auto;height:auto;font-size:min(3vw,16px);' +
-      'padding:0.4em 0.8em;max-width:120px;pointer-events:none;' +
-      'background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);border-radius:8px;');
+    element('tc-menu', '\u2715');
+    element('tc-lap', '');
 
     // ── Game Over / result label ──
-    el('tc-gameover-label', '',
-      'left:50%;top:40%;width:80vw;height:auto;font-size:min(7vw,40px);max-width:500px;' +
-      'pointer-events:none;background:none;border:none;text-shadow:0 0 12px rgba(0,0,0,0.9);' +
-      'transform:translate(-50%,-50%);');
-    el('tc-gameover', 'Menu',
-      'left:50%;bottom:6vh;width:18vw;height:11vw;font-size:min(3.5vw,18px);max-width:100px;max-height:65px;transform:translateX(-50%);');
+    element('tc-gameover-label', '');
+    element('tc-gameover', 'Menu');
 
     // ── HUD bars ──
-    createHudBar('tc-hud-boost', '\uD83D\uDD25', '#ff9900');
-    document.getElementById('tc-hud-boost').style.cssText +=
-      'left:2vw;right:50%;top:2vh;padding-right:1vw;';
-    createHudBar('tc-hud-damage', '\u26A0\uFE0F', '#ff3333');
-    document.getElementById('tc-hud-damage').style.cssText +=
-      'left:50%;right:14vw;top:2vh;padding-left:1vw;';
+    createHudBar('tc-hud-boost', '\uD83D\uDD25');
+    createHudBar('tc-hud-damage', '\u26A0\uFE0F');
 
-    // ── Season overlay ──
+    // ── Season overlay (styled via #season-overlay / #season-card in game.css) ──
     var overlay = document.createElement('div');
     overlay.id = 'season-overlay';
-    overlay.style.cssText =
-      'position:fixed;left:0;top:0;width:100%;height:100%;' +
-      'display:none;align-items:center;justify-content:center;' +
-      'pointer-events:auto;z-index:150;background:rgba(0,0,0,0.85);';
     var card = document.createElement('div');
     card.id = 'season-card';
-    card.style.cssText =
-      'background:rgba(20,20,40,0.95);color:#fff;border:2px solid rgba(255,255,255,0.3);' +
-      'border-radius:16px;padding:3vh 4vw;max-width:90vw;max-height:85vh;' +
-      'overflow-y:auto;font-family:Arial,sans-serif;text-align:center;' +
-      'box-sizing:border-box;min-width:min(80vw,360px);';
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
@@ -403,22 +348,19 @@
     wireKeyboard();
   }
 
-  function createHudBar(id, icon, color) {
+  function createHudBar(id, icon) {
     var container = document.getElementById('gameUI');
     var row = document.createElement('div');
     row.id = id;
-    row.style.cssText =
-      'position:absolute;display:none;align-items:center;pointer-events:none;height:2.5vh;min-height:14px;';
+    row.className = 'hud-bar';
     var iconEl = document.createElement('span');
     iconEl.textContent = icon;
-    iconEl.style.cssText = 'font-size:min(6vh,30px);margin-right:1vw;line-height:1;';
+    iconEl.className = 'hud-icon';
     var track = document.createElement('div');
-    track.style.cssText =
-      'flex:1;height:100%;background:rgba(0,0,0,0.4);border-radius:4px;overflow:hidden;';
+    track.className = 'hud-track';
     var fill = document.createElement('div');
     fill.id = id + '-fill';
-    fill.style.cssText =
-      'height:100%;width:0%;background:' + color + ';border-radius:4px;transition:width 0.15s;';
+    fill.className = 'hud-fill';
     track.appendChild(fill);
     row.appendChild(iconEl);
     row.appendChild(track);
@@ -438,55 +380,43 @@
     document.getElementById('season-overlay').style.display = 'none';
   }
 
-  function btnCss() {
-    return 'display:inline-block;margin:1.5vh 1vw;padding:1.5vh 4vw;' +
-      'background:rgba(255,255,255,0.18);color:#fff;border:2px solid rgba(255,255,255,0.4);' +
-      'border-radius:12px;font-family:Arial,sans-serif;font-weight:bold;' +
-      'font-size:min(4vw,20px);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;';
-  }
-
   function overlayBtn(id, label, handler) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('click', function () { handler(); });
-    el.addEventListener('touchstart', function (e) { e.preventDefault(); handler(); }, { passive: false });
+    var element = document.getElementById(id);
+    if (!element) return;
+    element.addEventListener('click', function () { handler(); });
+    element.addEventListener('touchstart', function (e) { e.preventDefault(); handler(); }, { passive: false });
   }
 
   // ── Season overview screen ──
   function showSeasonOverview() {
     uiMode = UI_SEASON_OVERVIEW;
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Season Overview</div>';
-    h += '<div style="display:flex;gap:1vw;justify-content:center;align-items:stretch;margin:1vh 0;">';
+    var h = '<div class="overlay-title">Season Overview</div>';
+    h += '<div class="season-grid">';
     // Show divisions from highest (Div 1 = index 3) to lowest (Div 4 = index 0)
     for (var di = 3; di >= 0; di--) {
       var players = season.divisions[di];
       var tracks = DIVISION_TRACKS[di];
       var isHumanDiv = (di === season.humanDiv);
-      h += '<div style="flex:1;background:rgba(255,255,255,' + (isHumanDiv ? '0.12' : '0.05') + ');' +
-        'border:1px solid rgba(255,255,255,' + (isHumanDiv ? '0.4' : '0.15') + ');' +
-        'border-radius:10px;padding:1.5vh 1vw;display:flex;flex-direction:column;">';
-      h += '<div style="font-size:min(3.5vw,17px);font-weight:bold;margin-bottom:1vh;' +
-        (isHumanDiv ? 'color:#ffdd44;' : '') + '">' + divLabel(di) + '</div>';
+      h += '<div class="season-card' + (isHumanDiv ? ' season-card-active' : '') + '">';
+      h += '<div class="season-label' + (isHumanDiv ? ' color-yellow' : '') + '">' + divLabel(di) + '</div>';
       // Players
       for (var p = 0; p < players.length; p++) {
         var pid = players[p];
         var isH = (pid === HUMAN_PLAYER);
-        h += '<div style="font-size:min(3vw,15px);padding:0.3vh 0;' +
-          (isH ? 'color:#ffdd44;font-weight:bold;' : 'opacity:0.8;') + '">' +
+        h += '<div class="season-player' + (isH ? ' season-player-human' : '') + '">' +
           driverName(pid) + '</div>';
       }
       // Spacer
-      h += '<div style="flex:1;"></div>';
+      h += '<div class="season-spacer"></div>';
       // Tracks
-      h += '<div style="margin-top:1.5vh;border-top:1px solid rgba(255,255,255,0.15);padding-top:1vh;">';
+      h += '<div class="season-tracks">';
       for (var t = 0; t < tracks.length; t++) {
-        h += '<div style="font-size:min(2.5vw,13px);opacity:0.6;padding:0.2vh 0;">' +
-          TRACK_NAMES[tracks[t]] + '</div>';
+        h += '<div class="season-track-name">' + TRACK_NAMES[tracks[t]] + '</div>';
       }
       h += '</div></div>';
     }
     h += '</div>';
-    h += '<div id="s-btn-go" style="' + btnCss() + 'margin-top:2vh;">Continue</div>';
+    h += '<div id="s-btn-go" class="overlay-button" style="margin-top:2vh;">Continue</div>';
     showOverlay(h);
     overlayBtn('s-btn-go', 'GO', function () { showPreRace(); });
   }
@@ -500,14 +430,14 @@
       return;
     }
     uiMode = UI_SEASON_PRE_RACE;
-    var h = '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:1vh;">' +
+    var h = '<div class="overlay-subtitle">' +
       divLabel(season.humanDiv) + ' \u2014 Race ' + (season.currentRace + 1) + ' of 6</div>';
-    h += '<div style="font-size:min(5vw,28px);margin:2vh 0;">' + TRACK_NAMES[race.trackIndex] + '</div>';
-    h += '<div style="font-size:min(6vw,32px);margin:2vh 0;">' +
-      driverName(race.driverA) + ' <span style="opacity:0.5;font-size:min(4vw,22px);">vs</span> ' +
+    h += '<div class="overlay-track">' + TRACK_NAMES[race.trackIndex] + '</div>';
+    h += '<div class="overlay-matchup">' +
+      driverName(race.driverA) + ' <span class="overlay-matchup-vs">vs</span> ' +
       driverName(race.driverB) + '</div>';
-    h += '<div id="s-btn-race" style="' + btnCss() + '">Race</div>';
-    h += '<div id="s-btn-quit" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Quit Season</div>';
+    h += '<div id="s-btn-race" class="overlay-button">Race</div>';
+    h += '<div id="s-btn-quit" class="overlay-button overlay-button-secondary">Quit Season</div>';
     showOverlay(h);
 
     overlayBtn('s-btn-race', 'RACE', beginSeasonRace);
@@ -534,19 +464,18 @@
 
   function showRaceResult(race) {
     uiMode = UI_SEASON_RESULT;
-    var h = '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:1vh;">' +
+    var h = '<div class="overlay-subtitle">' +
       'Race Result \u2014 ' + TRACK_NAMES[race.trackIndex] + '</div>';
-    h += '<div style="font-size:min(5vw,26px);margin:2vh 0;">' +
+    h += '<div class="overlay-result">' +
       driverName(race.driverA) + ' vs ' + driverName(race.driverB) + '</div>';
-    h += '<div style="font-size:min(4vw,22px);margin:1vh 0;">' +
+    h += '<div class="overlay-winner">' +
       '\uD83C\uDFC6 Winner: <b>' + driverName(race.winnerDriver) + '</b> (+2 pts)</div>';
-    h += '<div style="font-size:min(3.5vw,18px);margin:1vh 0;">' +
+    h += '<div class="overlay-fastest">' +
       '\u23F1\uFE0F Fastest Lap: <b>' + driverName(race.bestLapDriver) + '</b> (+1 pt)</div>';
     if (race.playerBestLapMs > 0) {
-      h += '<div style="font-size:min(3vw,16px);opacity:0.6;margin:1vh 0;">Your best lap: ' +
-        fmtLap(race.playerBestLapMs) + '</div>';
+      h += '<div class="overlay-detail">Your best lap: ' + fmtLap(race.playerBestLapMs) + '</div>';
     }
-    h += '<div id="s-btn-cont" style="' + btnCss() + '">Continue</div>';
+    h += '<div id="s-btn-cont" class="overlay-button">Continue</div>';
     showOverlay(h);
     overlayBtn('s-btn-cont', 'CONTINUE', advanceSeason);
   }
@@ -575,13 +504,13 @@
     currentDivAssign = na;
     humanDivision = na[HUMAN_PLAYER];
 
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">' + divLabel(di) + ' Standings</div>';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:min(3.5vw,18px);margin:1vh 0;">';
-    h += '<tr style="opacity:0.6;"><td style="text-align:left;padding:0.5vh 1vw;">#</td>' +
-      '<td style="text-align:left;padding:0.5vh 1vw;">Driver</td>' +
-      '<td style="text-align:center;padding:0.5vh 1vw;">W</td>' +
-      '<td style="text-align:center;padding:0.5vh 1vw;">FL</td>' +
-      '<td style="text-align:center;padding:0.5vh 1vw;">Pts</td></tr>';
+    var h = '<div class="overlay-title">' + divLabel(di) + ' Standings</div>';
+    h += '<table class="standings-table">';
+    h += '<tr class="standings-header"><td>#</td>' +
+      '<td>Driver</td>' +
+      '<td class="standings-center">W</td>' +
+      '<td class="standings-center">FL</td>' +
+      '<td class="standings-center">Pts</td></tr>';
 
     for (var i = 0; i < st.length; i++) {
       var d = st[i], p = season.points[d], pts = p.wins * 2 + p.bestLaps;
@@ -590,32 +519,32 @@
       if (i === 0 && di < 3)  badge = ' \u2B06\uFE0F';
       if (i === 0 && di === 3) badge = ' \uD83C\uDFC6';
       if (i === st.length - 1 && di > 0) badge = ' \u2B07\uFE0F';
-      h += '<tr style="' + (isH ? 'color:#ffdd44;' : '') + '">' +
-        '<td style="text-align:left;padding:0.5vh 1vw;">' + (i + 1) + '</td>' +
-        '<td style="text-align:left;padding:0.5vh 1vw;">' + driverName(d) + badge + '</td>' +
-        '<td style="text-align:center;padding:0.5vh 1vw;">' + p.wins + '</td>' +
-        '<td style="text-align:center;padding:0.5vh 1vw;">' + p.bestLaps + '</td>' +
-        '<td style="text-align:center;padding:0.5vh 1vw;font-weight:bold;">' + pts + '</td></tr>';
+      h += '<tr' + (isH ? ' class="color-yellow"' : '') + '>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + driverName(d) + badge + '</td>' +
+        '<td class="standings-center">' + p.wins + '</td>' +
+        '<td class="standings-center">' + p.bestLaps + '</td>' +
+        '<td class="standings-center standings-bold">' + pts + '</td></tr>';
     }
     h += '</table>';
 
     var top = st[0], bot = st[st.length - 1];
     if (top === HUMAN_PLAYER) {
-      if (di === 3) h += '<div style="font-size:min(5vw,26px);margin:2vh 0;color:#ffd700;">' +
+      if (di === 3) h += '<div class="overlay-result color-gold">' +
         '\uD83C\uDFC6 SUPER LEAGUE CHAMPION! \uD83C\uDFC6</div>';
-      else h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#44ff44;">' +
+      else h += '<div class="overlay-result-small color-green">' +
         '\u2B06\uFE0F Promoted to ' + divLabel(di + 1) + '!</div>';
     } else if (bot === HUMAN_PLAYER) {
-      if (di === 0) h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#ff8844;">' +
+      if (di === 0) h += '<div class="overlay-result-small color-orange">' +
         'Bottom of the league \u2014 try again!</div>';
-      else h += '<div style="font-size:min(4vw,20px);margin:2vh 0;color:#ff4444;">' +
+      else h += '<div class="overlay-result-small color-red">' +
         '\u2B07\uFE0F Relegated to ' + divLabel(di - 1) + '</div>';
     } else {
-      h += '<div style="font-size:min(3.5vw,18px);margin:2vh 0;opacity:0.7;">' +
+      h += '<div class="overlay-info">' +
         'Staying in ' + divLabel(di) + '</div>';
     }
 
-    h += '<div id="s-btn-next" style="' + btnCss() + '">Finish Season</div>';
+    h += '<div id="s-btn-next" class="overlay-button">Finish Season</div>';
     showOverlay(h);
     overlayBtn('s-btn-next', 'FINISH', finishSeason);
   }
@@ -771,18 +700,14 @@
 
   function showMpRoleSelect() {
     uiMode = UI_MP_ROLE_SELECT;
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Two Players</div>';
-    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">' +
-      'Connect via WebRTC peer-to-peer</div>';
-    h += '<div style="font-size:min(2.5vw,13px);opacity:0.5;margin-bottom:0.5vh;">Signaling server</div>';
-    h += '<input id="mp-sig-url" type="text" value="' + signalingUrl.replace(/"/g, '&quot;') + '" ' +
-      'style="font-size:min(3vw,15px);text-align:center;width:min(70vw,340px);' +
-      'padding:0.8vh 1.5vw;border:1px solid rgba(255,255,255,0.3);border-radius:8px;' +
-      'background:rgba(255,255,255,0.08);color:#fff;font-family:monospace;outline:none;' +
-      'margin-bottom:2vh;" />';
-    h += '<div id="mp-btn-host" style="' + btnCss() + '">Host Game</div><br>';
-    h += '<div id="mp-btn-join" style="' + btnCss() + '">Join Game</div><br>';
-    h += '<div id="mp-btn-back" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Back</div>';
+    var h = '<div class="overlay-title">Two Players</div>';
+    h += '<div class="overlay-description">Connect via WebRTC peer-to-peer</div>';
+    h += '<div class="overlay-label">Signaling server</div>';
+    h += '<input id="mp-sig-url" type="text" class="multiplayer-signaling-input" value="' +
+      signalingUrl.replace(/"/g, '&quot;') + '" />';
+    h += '<div id="mp-btn-host" class="overlay-button">Host Game</div><br>';
+    h += '<div id="mp-btn-join" class="overlay-button">Join Game</div><br>';
+    h += '<div id="mp-btn-back" class="overlay-button overlay-button-secondary">Back</div>';
     showOverlay(h);
 
     function saveSignalingUrl() {
@@ -803,11 +728,11 @@
 
   function startHosting() {
     uiMode = UI_MP_HOST_LOBBY;
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Hosting Game</div>';
-    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">Connecting to signaling server\u2026</div>';
-    h += '<div id="mp-host-code" style="font-size:min(10vw,60px);letter-spacing:0.3em;margin:2vh 0;"></div>';
-    h += '<div id="mp-host-status" style="font-size:min(3vw,16px);opacity:0.7;margin:1vh 0;">Setting up\u2026</div>';
-    h += '<div id="mp-btn-cancel" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Cancel</div>';
+    var h = '<div class="overlay-title">Hosting Game</div>';
+    h += '<div class="overlay-description">Connecting to signaling server\u2026</div>';
+    h += '<div id="mp-host-code" class="multiplayer-code-display"></div>';
+    h += '<div id="mp-host-status" class="multiplayer-status">Setting up\u2026</div>';
+    h += '<div id="mp-btn-cancel" class="overlay-button overlay-button-secondary">Cancel</div>';
     showOverlay(h);
     overlayBtn('mp-btn-cancel', 'CANCEL', function () {
       mpCleanup();
@@ -843,31 +768,30 @@
     mpTrackIndex = 0;
     selectTrack(mpTrackIndex);
     hideOverlay();
-    // Show track selection UI (reuse practise menu style but with different buttons)
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Select Track</div>';
-    h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:2vh;">Opponent connected!</div>';
-    h += '<div id="mp-track-name" style="font-size:min(5vw,26px);margin:2vh 0;">' +
-      TRACK_NAMES[mpTrackIndex] + '</div>';
+    // Show track selection UI
+    var h = '<div class="overlay-title">Select Track</div>';
+    h += '<div class="overlay-subtitle" style="margin-bottom:2vh;">Opponent connected!</div>';
+    h += '<div id="mp-track-name" class="overlay-result">' + TRACK_NAMES[mpTrackIndex] + '</div>';
     h += '<div style="display:flex;justify-content:center;gap:2vw;">';
-    h += '<div id="mp-btn-prev" style="' + btnCss() + '">\u25C0\uFE0E</div>';
-    h += '<div id="mp-btn-next" style="' + btnCss() + '">\u25B6\uFE0E</div>';
+    h += '<div id="mp-btn-prev" class="overlay-button">\u25C0\uFE0E</div>';
+    h += '<div id="mp-btn-next" class="overlay-button">\u25B6\uFE0E</div>';
     h += '</div>';
-    h += '<div id="mp-btn-go" style="' + btnCss() + 'margin-top:2vh;">Start Race</div>';
-    h += '<div id="mp-btn-cancel2" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Cancel</div>';
+    h += '<div id="mp-btn-go" class="overlay-button" style="margin-top:2vh;">Start Race</div>';
+    h += '<div id="mp-btn-cancel2" class="overlay-button overlay-button-secondary">Cancel</div>';
     showOverlay(h);
     overlayBtn('mp-btn-prev', 'PREV', function () {
       mpTrackIndex--;
       if (mpTrackIndex < 0) mpTrackIndex = getNumTracks() - 1;
       selectTrack(mpTrackIndex);
-      var el = document.getElementById('mp-track-name');
-      if (el) el.textContent = TRACK_NAMES[mpTrackIndex];
+      var element = document.getElementById('mp-track-name');
+      if (element) element.textContent = TRACK_NAMES[mpTrackIndex];
     });
     overlayBtn('mp-btn-next', 'NEXT', function () {
       mpTrackIndex++;
       if (mpTrackIndex >= getNumTracks()) mpTrackIndex = 0;
       selectTrack(mpTrackIndex);
-      var el = document.getElementById('mp-track-name');
-      if (el) el.textContent = TRACK_NAMES[mpTrackIndex];
+      var element = document.getElementById('mp-track-name');
+      if (element) element.textContent = TRACK_NAMES[mpTrackIndex];
     });
     overlayBtn('mp-btn-go', 'GO', function () {
       // Tell the joiner which track
@@ -897,15 +821,12 @@
 
   function showJoinScreen() {
     uiMode = UI_MP_JOIN;
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Join Game</div>';
-    h += '<div style="font-size:min(3vw,16px);opacity:0.7;margin-bottom:2vh;">Enter the 4-letter code from the host</div>';
-    h += '<input id="mp-code-input" type="text" maxlength="4" autocapitalize="characters" ' +
-      'style="font-size:min(10vw,60px);text-align:center;letter-spacing:0.3em;width:min(60vw,300px);' +
-      'padding:1vh 2vw;border:2px solid rgba(255,255,255,0.4);border-radius:12px;' +
-      'background:rgba(255,255,255,0.1);color:#fff;font-family:monospace;outline:none;" />';
-    h += '<div id="mp-join-status" style="font-size:min(3vw,16px);opacity:0.7;margin:1vh 0;min-height:3vh;"></div>';
-    h += '<div id="mp-btn-connect" style="' + btnCss() + '">Connect</div>';
-    h += '<div id="mp-btn-jback" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Back</div>';
+    var h = '<div class="overlay-title">Join Game</div>';
+    h += '<div class="overlay-description">Enter the 4-letter code from the host</div>';
+    h += '<input id="mp-code-input" type="text" maxlength="4" autocapitalize="characters" class="multiplayer-code-input" />';
+    h += '<div id="mp-join-status" class="multiplayer-status"></div>';
+    h += '<div id="mp-btn-connect" class="overlay-button">Connect</div>';
+    h += '<div id="mp-btn-jback" class="overlay-button overlay-button-secondary">Back</div>';
     showOverlay(h);
     // Focus input
     setTimeout(function () {
@@ -971,22 +892,22 @@
       won = mpPlayerFinishedFirst || mpOpponentWrecked;
     }
     uiMode = UI_MP_RESULT;
-    var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Race Complete</div>';
+    var h = '<div class="overlay-title">Race Complete</div>';
     if (wrecked && mpOpponentWrecked) {
-      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff8844;">BOTH WRECKED</div>';
+      h += '<div class="overlay-result-large color-orange">BOTH WRECKED</div>';
     } else if (wrecked) {
-      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff4444;">WRECKED</div>';
+      h += '<div class="overlay-result-large color-red">WRECKED</div>';
     } else if (won) {
-      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#44ff44;">\uD83C\uDFC6 YOU WIN!</div>';
+      h += '<div class="overlay-result-large color-green">\uD83C\uDFC6 YOU WIN!</div>';
     } else {
-      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff8844;">YOU LOSE</div>';
+      h += '<div class="overlay-result-large color-orange">YOU LOSE</div>';
     }
     var pBest = getPlayerBestLap();
     if (pBest > 0) {
-      h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin:1vh 0;">Your best lap: ' + fmtLap(pBest) + '</div>';
+      h += '<div class="overlay-info">Your best lap: ' + fmtLap(pBest) + '</div>';
     }
-    h += '<div id="mp-btn-again" style="' + btnCss() + '">Play Again</div>';
-    h += '<div id="mp-btn-quit" style="' + btnCss() + 'opacity:0.5;font-size:min(3vw,14px);">Quit</div>';
+    h += '<div id="mp-btn-again" class="overlay-button">Play Again</div>';
+    h += '<div id="mp-btn-quit" class="overlay-button overlay-button-secondary">Quit</div>';
     showOverlay(h);
     overlayBtn('mp-btn-again', 'AGAIN', function () {
       hideOverlay();
@@ -1000,8 +921,8 @@
       } else {
         // Show waiting screen
         uiMode = UI_MP_JOIN_LOBBY;
-        var h2 = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Waiting</div>';
-        h2 += '<div style="font-size:min(3vw,16px);opacity:0.7;">Waiting for host to select next track\u2026</div>';
+        var h2 = '<div class="overlay-title">Waiting</div>';
+        h2 += '<div class="overlay-description">Waiting for host to select next track\u2026</div>';
         showOverlay(h2);
       }
     });
@@ -1016,11 +937,11 @@
 
   // ── Main menu screen ──
   function showMainMenu() {
-    var h = '<div style="font-size:min(6vw,32px);margin-bottom:1vh;">STUNT CAR RACER</div>';
-    h += '<div style="font-size:min(3.5vw,18px);opacity:0.7;margin-bottom:3vh;">' + divLabel(humanDivision) + '</div>';
-    h += '<div id="mm-btn-practise" style="' + btnCss() + '">Practise</div><br>';
-    h += '<div id="mm-btn-season" style="' + btnCss() + '">Start the Racing Season</div><br>';
-    h += '<div id="mm-btn-twoplayer" style="' + btnCss() + '">Two Players</div>';
+    var h = '<div class="overlay-title-large">STUNT CAR RACER</div>';
+    h += '<div class="overlay-subtitle" style="margin-bottom:3vh;">' + divLabel(humanDivision) + '</div>';
+    h += '<div id="mm-btn-practise" class="overlay-button">Practise</div><br>';
+    h += '<div id="mm-btn-season" class="overlay-button">Start the Racing Season</div><br>';
+    h += '<div id="mm-btn-twoplayer" class="overlay-button">Two Players</div>';
     showOverlay(h);
     overlayBtn('mm-btn-practise', 'PRACTISE', function () {
       hideOverlay();

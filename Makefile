@@ -37,17 +37,21 @@ EMCC_FLAGS = \
 DIST = dist
 
 # Static PWA assets to copy into dist/ for production builds
-PWA_ASSETS = manifest.json sw.js icon-192.png icon-512.png multiplayer.js game.js
+PWA_ASSETS = manifest.json icon-192.png icon-512.png game.css
+
+# JavaScript sources (live in javascript/ but get copied flat into dist/)
+JS_SOURCES = javascript/sw.js javascript/multiplayer.js javascript/game.js
+JS_DIST    = $(patsubst javascript/%,$(DIST)/%,$(JS_SOURCES))
 
 # ─── Targets ────────────────────────────────────────────────
 
 .PHONY: all debug clean
 
-all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS))
+all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS)) $(JS_DIST)
 
 debug: $(DIST)/source.html
 
-$(DIST)/source.html: $(SOURCES) custom_shell.html multiplayer.js game.js | $(DIST)
+$(DIST)/source.html: $(SOURCES) custom_shell.html game.css $(JS_SOURCES) | $(DIST)
 	@echo "Building…"
 	@if [ "$(MAKECMDGOALS)" = "debug" ]; then \
 		echo "  (debug build)"; \
@@ -60,7 +64,10 @@ $(DIST)/source.html: $(SOURCES) custom_shell.html multiplayer.js game.js | $(DIS
 $(DIST)/%.json: %.json | $(DIST)
 	cp $< $@
 
-$(DIST)/%.js: %.js | $(DIST)
+$(DIST)/%.js: javascript/%.js | $(DIST)
+	cp $< $@
+
+$(DIST)/%.css: %.css | $(DIST)
 	cp $< $@
 
 $(DIST)/%.png: %.png | $(DIST)
