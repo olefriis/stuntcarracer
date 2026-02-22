@@ -97,8 +97,9 @@
   var touchDrive = { left: false, right: false, gas: false, brake: false, boost: false };
 
   // ── Multiplayer state ──────────────────────────────────────
-  var DEFAULT_SIGNALING_URL = 'http://' + window.location.hostname + ':9292';
-  var signalingUrl = localStorage.getItem('scr_signaling_url') || DEFAULT_SIGNALING_URL;
+  var DEFAULT_SIGNALING_URL = 'https://stuntcarracer.fly.dev';
+  localStorage.removeItem('scr_signaling_url');  // clean up from older versions
+  var signalingUrl = DEFAULT_SIGNALING_URL;
   var mpConnected = false;
   var mpTrackIndex = 0;
   var mpOpponentFinished = false;
@@ -779,7 +780,6 @@
       var inp = document.getElementById('mp-sig-url');
       if (inp) {
         signalingUrl = inp.value.replace(/\/+$/, '');
-        localStorage.setItem('scr_signaling_url', signalingUrl);
       }
     }
 

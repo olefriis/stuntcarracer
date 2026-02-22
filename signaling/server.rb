@@ -52,6 +52,28 @@ def gen_code
   4.times.map { chars[rand(chars.length)] }.join
 end
 
+get '/' do
+  # HTML page pointing people to olefriis.github.io/play
+  content_type :html
+  <<~HTML
+    <!DOCTYPE html>
+	<html>
+	<head>
+	  <meta charset="utf-8">
+	  <title>Stunt Car Racer Signaling Server</title>
+	</head>
+	<body>
+	  <h1>Stunt Car Racer Signaling Server</h1>
+	  <p>This server is used for WebRTC signaling in the two-player mode of Stunt
+	     Car Racer. It doesn't do anything on its own, but if you're seeing this page,
+	     it means the server is running and ready to handle signaling requests from the game.</p>
+	  <p>Go to <a href="https://olefriis.github.io/play">olefriis.github.io/play</a> and check out
+	  	 what this is all about!</p>
+	</body>
+	</html>
+  HTML
+end
+
 # Host creates a room
 post '/rooms' do
   cleanup!
