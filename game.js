@@ -103,6 +103,9 @@
   var mpConnected = false;
   var mpTrackIndex = 0;
   var mpOpponentFinished = false;
+  var mpOpponentWrecked = false;
+  var mpPlayerFinishedFirst = false;  // true if we sent 'finished' before receiving opponent's
+  var mpPlayerNotified = false;       // true once we've sent our 'finished' message
 
   // ── Season state ───────────────────────────────────────────
   var season = null;
@@ -712,6 +715,9 @@
         });
       } else if (msg.type === 'finished') {
         mpOpponentFinished = true;
+        mpOpponentWrecked = !!msg.wrecked;
+        // If we haven't notified yet, opponent finished first — we did NOT finish first
+        if (!mpPlayerNotified) mpPlayerFinishedFirst = false;
       } else if (msg.type === 'quit') {
         // Opponent explicitly quit — trigger the same disconnect handling
         mpConnected = false;
@@ -755,6 +761,9 @@
     SCR_Multiplayer.cleanup();
     mpConnected = false;
     mpOpponentFinished = false;
+    mpOpponentWrecked = false;
+    mpPlayerFinishedFirst = false;
+    mpPlayerNotified = false;
     setTwoPlayerMode(false);
   }
 
@@ -872,6 +881,9 @@
         startGame(-2);
         uiMode = UI_MP_RACE;
         mpOpponentFinished = false;
+        mpOpponentWrecked = false;
+        mpPlayerFinishedFirst = false;
+        mpPlayerNotified = false;
         showUIForMode();
       });
     });
@@ -950,15 +962,19 @@
   }
 
   function finishMpRace() {
-    // Notify opponent we finished
-    if (SCR_Multiplayer.isConnected()) {
-      SCR_Multiplayer.sendReliable({ type: 'finished' });
-    }
-    var won = isRaceWon();
+    // 'finished' message was already sent during race-end detection
     var wrecked = isPlayerWrecked();
+    // Determine result: won if we finished first and weren't wrecked,
+    // OR if opponent was wrecked and we weren't
+    var won = false;
+    if (!wrecked) {
+      won = mpPlayerFinishedFirst || mpOpponentWrecked;
+    }
     uiMode = UI_MP_RESULT;
     var h = '<div style="font-size:min(5vw,28px);margin-bottom:2vh;">Race Complete</div>';
-    if (wrecked) {
+    if (wrecked && mpOpponentWrecked) {
+      h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff8844;">BOTH WRECKED</div>';
+    } else if (wrecked) {
       h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#ff4444;">WRECKED</div>';
     } else if (won) {
       h += '<div style="font-size:min(6vw,32px);margin:2vh 0;color:#44ff44;">\uD83C\uDFC6 YOU WIN!</div>';
@@ -975,6 +991,10 @@
     overlayBtn('mp-btn-again', 'AGAIN', function () {
       hideOverlay();
       mpOpponentFinished = false;
+      mpOpponentWrecked = false;
+      mpPlayerFinishedFirst = false;
+      mpPlayerNotified = false;
+      goToMenu();  // reset C++ state fully between races
       if (SCR_Multiplayer.isHost()) {
         showMpHostTrack();
       } else {
@@ -1305,19 +1325,45 @@
     // Race-finished detection
     if ((uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) &&
         cppMode === GAME_IN_PROGRESS && isRaceFinished()) {
+
+      // ── Multiplayer: notify opponent and determine winner ──
+      if (uiMode === UI_MP_RACE && !mpPlayerNotified) {
+        mpPlayerNotified = true;
+        // If opponent hasn't notified us yet, we finished first
+        mpPlayerFinishedFirst = !mpOpponentFinished;
+        if (SCR_Multiplayer.isConnected()) {
+          SCR_Multiplayer.sendReliable({ type: 'finished', wrecked: isPlayerWrecked() });
+        }
+      }
+
       if (raceEndTime === 0) raceEndTime = Date.now();
 
       var lbl = document.getElementById('tc-gameover-label');
       if (lbl) {
-        if (uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE)
+        if (uiMode === UI_MP_RACE) {
+          if (isPlayerWrecked()) {
+            lbl.textContent = mpOpponentFinished ? 'WRECKED' : 'WRECKED \u2013 WAITING\u2026';
+          } else {
+            lbl.textContent = mpPlayerFinishedFirst ? 'RACE WON' : 'RACE LOST';
+          }
+        } else if (uiMode === UI_SEASON_RACE) {
           lbl.textContent = isPlayerWrecked() ? 'WRECKED' : (isRaceWon() ? 'RACE WON' : 'RACE LOST');
-        else
+        } else {
           lbl.textContent = isPlayerWrecked() ? 'WRECKED' : 'RACE COMPLETE';
+        }
         lbl.style.display = 'flex';
         lbl.style.opacity = (Math.floor(Date.now() / 500) % 2 === 0) ? '1' : '0.2';
       }
 
-      if (Date.now() - raceEndTime > 6000) {
+      // ── Determine when to exit the race ──
+      // For MP: wait until both players have finished (or 30s safety timeout)
+      var canExit = true;
+      if (uiMode === UI_MP_RACE) {
+        var elapsed = Date.now() - raceEndTime;
+        canExit = (mpOpponentFinished && elapsed > 3000) || elapsed > 30000;
+      }
+
+      if (canExit && Date.now() - raceEndTime > 6000) {
         raceEndTime = 0;
         if (uiMode === UI_MP_RACE) {
           setGameOver();
