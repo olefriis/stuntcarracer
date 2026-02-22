@@ -18,7 +18,7 @@ require 'sinatra'
 require 'json'
 require 'securerandom'
 
-set :port, 9292
+set :port, ENV.fetch('PORT', 9292).to_i
 set :bind, '0.0.0.0'
 
 # Enable CORS for local development
