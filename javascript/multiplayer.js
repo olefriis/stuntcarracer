@@ -24,6 +24,11 @@ var SCR_Multiplayer = (function () {
   var peerId = '';
   var isHost = false;
   var pollTimer = null;
+  var pollInterval = 1000;    // base polling interval (ms)
+  var pollBackoff = 1000;     // current interval (grows on errors)
+  var pollDeadline = 0;       // timestamp: stop polling after this
+  var POLL_MAX_BACKOFF = 8000;
+  var POLL_TIMEOUT = 180000;  // 3 minutes
 
   var pc = null;           // RTCPeerConnection
   var dcGame = null;       // unreliable data channel (game state)
@@ -145,19 +150,34 @@ var SCR_Multiplayer = (function () {
 
   // ── Signaling poll loop ──
 
-  function startPolling(handler) {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(function () {
+  function startPolling(handler, onTimeout) {
+    stopPolling();
+    pollBackoff = pollInterval;
+    pollDeadline = Date.now() + POLL_TIMEOUT;
+
+    function poll() {
+      if (Date.now() > pollDeadline) {
+        stopPolling();
+        if (onTimeout) onTimeout();
+        return;
+      }
       sigPoll().then(function (data) {
+        pollBackoff = pollInterval;  // reset backoff on success
         if (data.messages) {
           data.messages.forEach(handler);
         }
-      }).catch(function () {});
-    }, 300);
+        pollTimer = setTimeout(poll, pollBackoff);
+      }).catch(function () {
+        pollBackoff = Math.min(pollBackoff * 2, POLL_MAX_BACKOFF);
+        pollTimer = setTimeout(poll, pollBackoff);
+      });
+    }
+
+    pollTimer = setTimeout(poll, 0);
   }
 
   function stopPolling() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   }
 
   // ── Host flow ──
@@ -190,6 +210,10 @@ var SCR_Multiplayer = (function () {
               sigSend({ type: 'offer', sdp: pc.localDescription });
             });
           }
+        }, function () {
+          // Polling timed out — clean up and notify
+          cleanup();
+          if (onClose) onClose();
         });
 
         // When data channel opens, we're connected
@@ -240,6 +264,10 @@ var SCR_Multiplayer = (function () {
             pc.addIceCandidate(new RTCIceCandidate(msg.candidate))
               .catch(function (e) { console.error('addIce:', e); });
           }
+        }, function () {
+          // Polling timed out — clean up and reject
+          cleanup();
+          reject(new Error('Connection timed out'));
         });
 
         // When data channel opens, resolve
