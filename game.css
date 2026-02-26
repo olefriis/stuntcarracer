@@ -212,18 +212,7 @@
   font-size: min(5vw, 28px);
 }
 
-#tc-lap {
-  right: 2vw;
-  top: calc(2vh + 10vw + 1vh);
-  width: auto; height: auto;
-  font-size: min(3vw, 16px);
-  padding: 0.4em 0.8em;
-  max-width: 120px;
-  pointer-events: none;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-}
+
 
 /* ── Game over / result ──────────────────────────────────── */
 
@@ -278,21 +267,78 @@
   transition: width 0.15s;
 }
 
-#tc-hud-boost {
-  left: 2vw; right: 50%;
-  top: 2vh;
-  padding-right: 1vw;
-}
-
-#tc-hud-boost-fill { background: #ff9900; }
-
 #tc-hud-damage {
-  left: 50%; right: 14vw;
+  left: 2vw; right: 14vw;
   top: 2vh;
   padding-left: 1vw;
 }
 
 #tc-hud-damage-fill { background: #ff3333; }
+
+/* ── HUD box (left side) ─────────────────────────────────── */
+
+#tc-hud-box {
+  position: absolute;
+  display: none;
+  left: 1.5vw;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  flex-direction: row;
+  align-items: stretch;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.6em 0.8em;
+  gap: 0.6em;
+}
+
+.hud-speed-track {
+  width: 6px;
+  min-width: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-speed-fill {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 0%;
+  border-radius: 3px;
+  background: linear-gradient(0deg, #44cc44, #cccc00, #ff4400);
+  transition: height 0.10s;
+}
+
+.hud-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.hud-row {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 22px;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  line-height: 1.4;
+  min-height: 1.4em;
+}
+
+/* Compact HUD on mobile / touch devices */
+.hud-box-mobile {
+  padding: 0.4em 0.6em !important;
+  gap: 0.5em !important;
+}
+.hud-box-mobile .hud-speed-track {
+  width: 5px;
+  min-width: 5px;
+}
+.hud-box-mobile .hud-row {
+  font-size: 12px;
+}
 
 /* ── Overlay buttons (used in season and multiplayer screens) ── */
 

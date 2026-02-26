@@ -1585,7 +1585,7 @@ extern long players_road_x_position;
 extern long rear_wheel_surface_x_position;
 
 static long difference_between_players = 0;
-static long smallest_distance_between_players = 0;
+long smallest_distance_between_players = 0;
 
 
 static void CalculateDistancesBetweenPlayers( void )

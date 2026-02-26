@@ -1741,6 +1741,9 @@ void CALLBACK OnDestroyDevice( void *pUserContext )
 // JavaScript API — exported functions for JS to drive the game flow
 //--------------------------------------------------------------------------------------
 extern long requestedOpponentID;
+extern double lapStartTime[];
+extern long smallest_distance_between_players;
+extern bool opponent_behind_player;
 
 extern "C" {
 
@@ -1875,6 +1878,27 @@ int jsGetOpponentBestLap() { return (int)(bestLapTime[OPPONENT]); }
 // Is solo mode active?
 EMSCRIPTEN_KEEPALIVE
 int jsIsSoloMode() { return soloMode ? 1 : 0; }
+
+// Get display speed (0–240)
+EMSCRIPTEN_KEEPALIVE
+int jsGetDisplaySpeed() { return (int)CalculateDisplaySpeed(); }
+
+// Get current lap elapsed time in milliseconds (0 if lap hasn't started)
+EMSCRIPTEN_KEEPALIVE
+int jsGetCurrentLapTime() {
+    if (lapStartTime[PLAYER] <= 0) return 0;
+    double elapsed = DXUTGetTime() - lapStartTime[PLAYER];
+    return (int)elapsed;
+}
+
+// Get signed distance to opponent: positive = opponent ahead, negative = player ahead.
+// Returns raw distance units; 0 when no opponent.
+EMSCRIPTEN_KEEPALIVE
+int jsGetDistanceToOpponent() {
+    long dist = smallest_distance_between_players;
+    if (opponent_behind_player) dist = -dist;
+    return (int)dist;
+}
 
 // ── Two-player mode API ──
 

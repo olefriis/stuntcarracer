@@ -215,6 +215,9 @@
   function getLapNumber()      { return Module._jsGetLapNumber(); }
   function getPlayerBestLap()  { return Module._jsGetPlayerBestLap(); }
   function getOpponentBestLap(){ return Module._jsGetOpponentBestLap(); }
+  function getDisplaySpeed()   { return Module._jsGetDisplaySpeed(); }
+  function getCurrentLapTime() { return Module._jsGetCurrentLapTime(); }
+  function getDistanceToOpponent() { return Module._jsGetDistanceToOpponent(); }
 
   // Two-player C++ API
   function setTwoPlayerMode(on)      { Module._jsSetTwoPlayerMode(on ? 1 : 0); }
@@ -326,15 +329,16 @@
 
     // ── In-Game common ──
     element('tc-menu', '\u2715');
-    element('tc-lap', '');
 
     // ── Game Over / result label ──
     element('tc-gameover-label', '');
     element('tc-gameover', 'Menu');
 
-    // ── HUD bars ──
-    createHudBar('tc-hud-boost', '\uD83D\uDD25');
+    // ── HUD: damage bar at top ──
     createHudBar('tc-hud-damage', '\u26A0\uFE0F');
+
+    // ── HUD: info box (left side) ──
+    createHudBox();
 
     // ── Season overlay (styled via #season-overlay / #season-card in game.css) ──
     var overlay = document.createElement('div');
@@ -365,6 +369,38 @@
     row.appendChild(iconEl);
     row.appendChild(track);
     container.appendChild(row);
+  }
+
+  function createHudBox() {
+    var container = document.getElementById('gameUI');
+    var box = document.createElement('div');
+    box.id = 'tc-hud-box';
+    if (isMobile) box.classList.add('hud-box-mobile');
+
+    // Vertical speed bar
+    var track = document.createElement('div');
+    track.className = 'hud-speed-track';
+    var fill = document.createElement('div');
+    fill.id = 'hud-speed-fill';
+    fill.className = 'hud-speed-fill';
+    track.appendChild(fill);
+    box.appendChild(track);
+
+    // Text column
+    var text = document.createElement('div');
+    text.className = 'hud-text';
+    var ids = ['hud-lap', 'hud-boost', 'hud-blank', 'hud-distance', 'hud-laptime', 'hud-bestlap'];
+    for (var i = 0; i < ids.length; i++) {
+      var row = document.createElement('div');
+      row.className = 'hud-row';
+      row.id = ids[i];
+      row.textContent = '\u00A0'; // non-breaking space to reserve height
+      text.appendChild(row);
+    }
+    text.appendChild(document.createElement('div')); // spacer
+    box.appendChild(text);
+
+    container.appendChild(box);
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -1188,7 +1224,7 @@
     'tc-prev', 'tc-next', 'tc-select', 'tc-trackname', 'tc-backmain',
     'tc-back', 'tc-start',
     'tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost',
-    'tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage',
+    'tc-menu', 'tc-hud-damage', 'tc-hud-box',
     'tc-gameover-label', 'tc-gameover'
   ];
 
@@ -1219,7 +1255,7 @@
       case UI_PRACTISE_RACE:
       case UI_SEASON_RACE:
       case UI_MP_RACE:
-        showEls(['tc-menu', 'tc-lap', 'tc-hud-boost', 'tc-hud-damage']);
+        showEls(['tc-menu', 'tc-hud-damage', 'tc-hud-box']);
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
         break;
       case UI_PRACTISE_RESULT:
@@ -1302,22 +1338,52 @@
       }
     }
 
-    // Lap counter
-    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) {
-      var lapEl = document.getElementById('tc-lap');
-      if (lapEl) {
-        var lap = getLapNumber();
-        if (lap < 1) lapEl.style.display = 'none';
-        else { lapEl.style.display = 'flex'; lapEl.textContent = 'Lap ' + Math.min(lap, 3) + '/3'; }
-      }
-    }
-
-    // HUD bars
+    // HUD updates
     if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE || uiMode === UI_PRACTISE_RESULT) {
-      var bf = document.getElementById('tc-hud-boost-fill');
-      if (bf) { var mx = getBoostMax(); bf.style.width = (mx > 0 ? Math.round(100 * getBoostReserve() / mx) : 0) + '%'; }
+      // Damage bar (top)
       var df = document.getElementById('tc-hud-damage-fill');
       if (df) df.style.width = Math.min(100, Math.round(100 * getDamage() / 255)) + '%';
+
+      // Vertical speed bar
+      var sf = document.getElementById('hud-speed-fill');
+      if (sf) sf.style.height = Math.min(100, Math.round(100 * getDisplaySpeed() / 240)) + '%';
+
+      // Lap row
+      var lap = getLapNumber();
+      var lapEl = document.getElementById('hud-lap');
+      if (lapEl) lapEl.textContent = lap >= 1 ? ('Lap ' + Math.min(lap, 3) + '/3') : 'Lap -/3';
+
+      // Boost row
+      var bEl = document.getElementById('hud-boost');
+      if (bEl) bEl.textContent = 'Boost ' + getBoostReserve();
+
+      // Distance to opponent
+      var distEl = document.getElementById('hud-distance');
+      if (distEl) {
+        if (uiMode === UI_PRACTISE_RACE || uiMode === UI_PRACTISE_RESULT) {
+          distEl.textContent = '\u00A0';
+        } else {
+          var rawDist = getDistanceToOpponent();
+          var sign = rawDist < 0 ? '-' : '';
+          var absDist = Math.abs(rawDist);
+          var digits = absDist > 9999 ? '9999' : ('0000' + absDist).slice(-4);
+          distEl.textContent = sign + digits;
+        }
+      }
+
+      // Current lap time
+      var ltEl = document.getElementById('hud-laptime');
+      if (ltEl) {
+        var curMs = getCurrentLapTime();
+        ltEl.textContent = (lap >= 1 && curMs > 0) ? fmtLap(curMs) : '\u00A0';
+      }
+
+      // Best lap time
+      var blEl = document.getElementById('hud-bestlap');
+      if (blEl) {
+        var bestMs = getPlayerBestLap();
+        blEl.textContent = bestMs > 0 ? (fmtLap(bestMs) + ' \u2605') : '\u00A0';
+      }
     }
 
     // ── Multiplayer per-frame state exchange ──
