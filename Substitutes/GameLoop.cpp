@@ -1,5 +1,6 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <cstring>
 
 #include "../dxstdafx.h"
 #include "TouchControls.h"
@@ -91,32 +92,57 @@ EM_BOOL one_iter(double time, void* userData) {
 // Implemented in StuntCarRacer.cpp
 INT WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int );
 
-UINT mapKeyCodeToDirectXChar(int keyCode) {
-	// Arrow keys for steering and accel/brake
-	if (keyCode == 37) return 'S';       // Left arrow = steer left
-	if (keyCode == 39) return 'D';       // Right arrow = steer right
-	if (keyCode == 38) return 0x26;      // Up arrow = VK_UP = accelerate
-	if (keyCode == 40) return 0x28;      // Down arrow = VK_DOWN = brake
-	if (keyCode == 16) return 0x10;      // Shift = VK_SHIFT = boost modifier
+UINT mapKeyToDirectXChar(const char *key, int keyCode) {
+	// Use the modern 'key' string field (reliable in all browsers)
+	if (key[0] != '\0') {
+		// Arrow keys
+		if (strcmp(key, "ArrowLeft") == 0)  return 'S';
+		if (strcmp(key, "ArrowRight") == 0) return 'D';
+		if (strcmp(key, "ArrowUp") == 0)    return 0x26;   // VK_UP
+		if (strcmp(key, "ArrowDown") == 0)  return 0x28;   // VK_DOWN
+		if (strcmp(key, "Shift") == 0)      return 0x10;   // VK_SHIFT
 
-	// TODO: Map something to F1-F10 (VK_F1-VK_F10)
+		// Single-character keys: A-Z, digits, space
+		if (key[1] == '\0') {
+			char c = key[0];
+			if (c >= 'a' && c <= 'z') return c - 32;  // uppercase
+			return (UINT)(unsigned char)c;
+		}
 
-	// A-Z, the enter key, and the space key are mapped to the same key code
+		// Named keys
+		if (strcmp(key, "Enter") == 0)      return 0x0D;   // VK_RETURN
+		if (strcmp(key, "Backspace") == 0)   return 0x08;   // VK_BACK
+		if (strcmp(key, "Escape") == 0)      return 0x1B;   // VK_ESCAPE
+		if (strcmp(key, "F1") == 0)          return 0x70;   // VK_F1
+		if (strcmp(key, "F2") == 0)          return 0x71;
+		if (strcmp(key, "F3") == 0)          return 0x72;
+		if (strcmp(key, "F4") == 0)          return 0x73;
+		if (strcmp(key, "F5") == 0)          return 0x74;
+		if (strcmp(key, "F6") == 0)          return 0x75;
+		if (strcmp(key, "F7") == 0)          return 0x76;
+		if (strcmp(key, "F8") == 0)          return 0x77;
+		if (strcmp(key, "F9") == 0)          return 0x78;
+		if (strcmp(key, "F10") == 0)         return 0x79;
+	}
+
+	// Fallback to deprecated keyCode for anything unrecognised
 	return keyCode;
 }
 
 EM_BOOL key_callback(int eventType, const EmscriptenKeyboardEvent *e, void *userData) {
 	if (keyboardCallback) {
-		UINT directXKeyCode = mapKeyCodeToDirectXChar(e->keyCode);
-		if (eventType == EMSCRIPTEN_EVENT_KEYDOWN) {
-			keyboardCallback(directXKeyCode, true, e->altKey, NULL);
-		} else if (eventType == EMSCRIPTEN_EVENT_KEYUP) {
-			keyboardCallback(directXKeyCode, false, e->altKey, NULL);
-		}
+		UINT directXKeyCode = mapKeyToDirectXChar(e->key, e->keyCode);
+		bool isDown = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);
+		keyboardCallback(directXKeyCode, isDown, e->altKey, NULL);
 	} else {
 		Error("No keyboard callback set");
 	}
-	return 0;
+	// Suppress default browser action for game keys (prevents page scroll etc.)
+	UINT mapped = mapKeyToDirectXChar(e->key, e->keyCode);
+	if (mapped == 0x26 || mapped == 0x28 || mapped == 'S' || mapped == 'D' ||
+	    mapped == 0x10 || mapped == ' ')
+		return EM_TRUE;
+	return EM_FALSE;
 }
 
 EM_JS(void, call_alert, (), {
