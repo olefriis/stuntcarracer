@@ -1,5 +1,5 @@
-stuntcarracer
-=============
+Stunt Car Racer
+===============
 
 A fork of a fork... This is a fork of
 [fluffyfreak/stuntcarracer](https://github.com/fluffyfreak/stuntcarracer), 
@@ -31,8 +31,36 @@ project uses a separate DirectX emulation library, and as such is a much cleaner
 approach. I am not worthy!
 
 However, I'll continue this fork nevertheless! My mission is to create a
-version that is more "web-native" and mobile-friendly. And at some point I'll
-also implement the original game system, i.e., tournament mode etc.
+version that is more "web-native" and mobile-friendly, which I've done to some
+degree. There's also a tournament system like in the original game, and...
+two-player mode! (Really, try this out!!)
+
+You can play it at [https://olefriis.github.io/play](https://olefriis.github.io/play).
+
+In order to build and run the game locally, install
+[Emscripten](https://emscripten.org) and run
+
+```shell
+$ ./build-and-serve.sh
+```
+
+...and point a browser to
+[http://localhost:8000/source.html](http://localhost:8000/source.html).
+
+If you want to run in two-player mode, you need to run the simple Sinatra-based
+web service in the `signaling` folder. Install
+[Ruby](https://www.ruby-lang.org/en/), then run:
+
+```shell
+$ bundle install
+$ bundle exec rackup --host 0.0.0.0 --port 8080
+```
+
+Then specify `http://localhost:8080` (or whatever local IP name your computer is
+exposed as on the local network) as the Signaling Server on the Two Players join
+screen.
+
+---
 
 From the original SourceForge page:
 

@@ -16,6 +16,10 @@ the DirectX functions in a way that they can be called from the original game co
 
 The DirectX (and other) wrappers are located in the `Substitutes` folder.
 
+This version of the game extends the C++ version with a tournament mode and a
+two-player mode. The two-player mode uses WebRTC for peer-to-peer communication,
+and a simple Sinatra-based web service (in the `signaling` folder) for signaling.
+
 # Building
 
 To build the project, you will need to have Emscripten installed and set up on your
