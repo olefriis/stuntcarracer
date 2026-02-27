@@ -129,7 +129,17 @@ UINT mapKeyToDirectXChar(const char *key, int keyCode) {
 	return keyCode;
 }
 
+EM_JS(int, isInputFocused, (), {
+	var el = document.activeElement;
+	if (!el) return 0;
+	var tag = el.tagName;
+	return (tag === 'INPUT' || tag === 'TEXTAREA') ? 1 : 0;
+});
+
 EM_BOOL key_callback(int eventType, const EmscriptenKeyboardEvent *e, void *userData) {
+	// Don't intercept keys when typing in an input field
+	if (isInputFocused()) return EM_FALSE;
+
 	if (keyboardCallback) {
 		UINT directXKeyCode = mapKeyToDirectXChar(e->key, e->keyCode);
 		bool isDown = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);

@@ -738,7 +738,7 @@
   function showMpRoleSelect() {
     uiMode = UI_MP_ROLE_SELECT;
     var h = '<div class="overlay-title">Two Players</div>';
-    h += '<div class="overlay-description">Connect via WebRTC peer-to-peer</div>';
+    h += '<div class="overlay-subtitle" style="color:#ff6;margin-bottom:1vh;">\u26A0\uFE0E Works best on a local network</div>';
     h += '<div class="overlay-label">Signaling server</div>';
     h += '<input id="mp-sig-url" type="text" class="multiplayer-signaling-input" value="' +
       signalingUrl.replace(/"/g, '&quot;') + '" />';
@@ -1146,6 +1146,10 @@
 
   function wireKeyboard() {
     document.addEventListener('keydown', function (e) {
+      // Don't intercept keys when typing in an input field
+      var tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
       // Season overlay: Enter/Space → primary button, Escape → quit
       if (uiMode === UI_SEASON_OVERVIEW || uiMode === UI_SEASON_PRE_RACE || uiMode === UI_SEASON_RESULT || uiMode === UI_SEASON_STANDINGS) {
         if (e.key === 'Enter' || e.key === ' ') {
