@@ -1846,6 +1846,26 @@ int jsGetGameMode() { return (int)GameMode; }
 EMSCRIPTEN_KEEPALIVE
 void jsSetGameOver() { GameMode = GAME_OVER; }
 
+#ifdef CHEAT_MODE
+// Cheat: force win with best lap
+EMSCRIPTEN_KEEPALIVE
+void jsCheatWin() {
+    raceFinished = true;
+    raceWon = true;
+    bestLapTime[PLAYER] = 30000;    // 30 seconds
+    bestLapTime[OPPONENT] = 60000;  // 60 seconds
+}
+
+// Cheat: force loss without best lap
+EMSCRIPTEN_KEEPALIVE
+void jsCheatLose() {
+    raceFinished = true;
+    raceWon = false;
+    bestLapTime[PLAYER] = 60000;    // 60 seconds
+    bestLapTime[OPPONENT] = 30000;  // 30 seconds
+}
+#endif
+
 // Get track name as UTF-8 string (returns pointer to static buffer)
 EMSCRIPTEN_KEEPALIVE
 const char* jsGetTrackName() {

@@ -50,6 +50,14 @@ For a debug build with the standard Emscripten shell (small canvas, log area), r
 ./build-and-serve.sh debug
 ```
 
+You can also specify `CHEAT=1` to enable cheat mode, which adds W/L keys to force win/loss during races:
+
+```bash
+CHEAT=1 make
+```
+
+(Remember to bust the cache after building with cheat mode, see below.)
+
 # Cache Busting
 
 The production build includes a service worker (`sw.js`) that caches assets for

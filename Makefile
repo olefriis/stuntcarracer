@@ -1,9 +1,10 @@
 # Stunt Car Racer — Emscripten Build
 #
 # Usage:
-#   make       — production build (fullscreen, custom shell, PWA assets)
-#   make debug — debug build (small canvas, log area)
-#   make clean — remove build output
+#   make            — production build (fullscreen, custom shell, PWA assets)
+#   make debug      — debug build (small canvas, log area)
+#   make CHEAT=1    — build with cheat keys (W=win, L=lose during races)
+#   make clean      — remove build output
 #
 # Requires Emscripten 5.0+ (emcc on PATH).
 
@@ -33,6 +34,14 @@ EMCC_FLAGS = \
 	--embed-file Tracks \
 	--embed-file Bitmap \
 	--embed-file Sounds
+
+# Cheat mode: CHEAT=1 adds W/L keys to force win/loss during races
+comma := ,
+ifdef CHEAT
+EMCC_FLAGS += -DCHEAT_MODE
+# Append cheat functions to the export list
+EMCC_FLAGS := $(subst _jsSetOpponentState"],_jsSetOpponentState"$(comma)"_jsCheatWin"$(comma)"_jsCheatLose"],$(EMCC_FLAGS))
+endif
 
 DIST = dist
 

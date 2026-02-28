@@ -110,6 +110,7 @@
   // ── Season state ───────────────────────────────────────────
   var season = null;
   var humanDivision = 0;
+  var superLeague = false;
   var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
 
@@ -119,6 +120,7 @@
     try {
       var data = {
         humanDivision: humanDivision,
+        superLeague: superLeague,
         currentDivisionAssignments: currentDivisionAssignments,
         season: season,
         seasonStartDivisionAssignments: seasonStartDivisionAssignments
@@ -133,6 +135,7 @@
       if (!raw) return;
       var data = JSON.parse(raw);
       if (data.humanDivision != null) humanDivision = data.humanDivision;
+      if (data.superLeague != null) superLeague = data.superLeague;
       if (data.currentDivisionAssignments) currentDivisionAssignments = data.currentDivisionAssignments;
       if (data.season) season = data.season;
       if (data.seasonStartDivisionAssignments) seasonStartDivisionAssignments = data.seasonStartDivisionAssignments;
@@ -221,7 +224,10 @@
     return players;
   }
 
-  function divLabel(idx) { return 'Division ' + (4 - idx); }
+  function divLabel(idx) {
+    var prefix = superLeague ? 'Super Division ' : 'Division ';
+    return prefix + (4 - idx);
+  }
 
   function fmtLap(ms) {
     if (!ms || ms <= 0) return '-';
@@ -272,6 +278,11 @@
   function startGame(opp)      { Module._jsStartGame(opp); }
   function goToMenu()          { Module._jsGoToMenu(); }
   function setGameOver()       { Module._jsSetGameOver(); }
+
+  // Cheat mode (only available in CHEAT=1 builds)
+  var cheatAvailable = false;
+  function cheatWin()  { if (cheatAvailable) Module._jsCheatWin(); }
+  function cheatLose() { if (cheatAvailable) Module._jsCheatLose(); }
   function setDriveInput(f)    { Module._touchSetDriveInput(f); }
 
   // ── Fade transition helper ─────────────────────────────────
@@ -566,8 +577,22 @@
       na[sH[0]] = d + 1;
       na[sA[sA.length - 1]] = d;
     }
+
+    // Check if the player won Division 1
+    var top = st[0];
+    var playerWonDivisionOne = (top === HUMAN_PLAYER && di === 3);
+    var enteringSuperLeague = playerWonDivisionOne && !superLeague;
+    var superLeagueChampion = playerWonDivisionOne && superLeague;
+
+    if (enteringSuperLeague) {
+      // Entering super league: reset all division assignments
+      superLeague = true;
+      na = INITIAL_DIVISIONS.slice();
+      humanDivision = na[HUMAN_PLAYER]; // back to Division 4
+    } else {
+      humanDivision = na[HUMAN_PLAYER];
+    }
     currentDivisionAssignments = na;
-    humanDivision = na[HUMAN_PLAYER];
 
     var h = '<div class="overlay-title">' + divLabel(di) + ' Standings</div>';
     h += '<table class="standings-table">';
@@ -593,11 +618,17 @@
     }
     h += '</table>';
 
-    var top = st[0], bot = st[st.length - 1];
-    if (top === HUMAN_PLAYER) {
-      if (di === 3) h += '<div class="overlay-result color-gold">' +
+    var bot = st[st.length - 1];
+    if (superLeagueChampion) {
+      h += '<div class="overlay-result color-gold">' +
         '\uD83C\uDFC6 SUPER LEAGUE CHAMPION! \uD83C\uDFC6</div>';
-      else h += '<div class="overlay-result-small color-green">' +
+      h += '<div class="overlay-detail">Excellent driving \u2014 well done!</div>';
+    } else if (enteringSuperLeague) {
+      h += '<div class="overlay-result color-gold">' +
+        '\u2B06\uFE0F Promoted to the SUPER LEAGUE! \u2B06\uFE0F</div>';
+      h += '<div class="overlay-detail">Back to Division 4 with faster cars and less boost!</div>';
+    } else if (top === HUMAN_PLAYER) {
+      h += '<div class="overlay-result-small color-green">' +
         '\u2B06\uFE0F Promoted to ' + divLabel(di + 1) + '!</div>';
     } else if (bot === HUMAN_PLAYER) {
       if (di === 0) h += '<div class="overlay-result-small color-orange">' +
@@ -1017,7 +1048,7 @@
     h += '<div id="mm-btn-season" class="overlay-button">' + seasonLabel + '</div><br>';
     h += '<div id="mm-btn-twoplayer" class="overlay-button">Two Players</div>';
     // Reset button — only show if there is progress to reset
-    if (season || humanDivision > 0) {
+    if (season || humanDivision > 0 || superLeague) {
       h += '<div id="mm-btn-reset" class="overlay-button overlay-button-secondary" style="margin-top:2vh;">Reset Progress</div>';
     }
     h += '<div id="mm-btn-credits" class="overlay-button credits-btn">?</div>';
@@ -1054,10 +1085,10 @@
 
   function showResetOptions() {
     // If player has progressed beyond Division 4, offer two choices
+    var hasProgressed = humanDivision > 0 || superLeague;
     var canResetSeason = season && seasonStartDivisionAssignments;
-    var canResetAll = humanDivision > 0 || season;
     var h = '<div class="overlay-title">Reset Progress</div>';
-    if (canResetSeason && humanDivision > 0) {
+    if (canResetSeason && hasProgressed) {
       h += '<div class="overlay-description">Choose what to reset:</div>';
       h += '<div id="reset-btn-season" class="overlay-button">Reset Current Season</div>';
       h += '<div class="overlay-detail">Restart the season in ' + divLabel(humanDivision) + '</div><br>';
@@ -1065,7 +1096,7 @@
       h += '<div class="overlay-detail">Go back to Division 4</div>';
     } else {
       h += '<div class="overlay-description">This will reset all progress' +
-        (humanDivision > 0 ? ' and return you to Division 4' : '') + '.</div>';
+        (hasProgressed ? ' and return you to Division 4' : '') + '.</div>';
       h += '<div id="reset-btn-all" class="overlay-button">Reset</div>';
     }
     h += '<div id="reset-btn-cancel" class="overlay-button overlay-button-secondary" style="margin-top:2vh;">Cancel</div>';
@@ -1082,6 +1113,7 @@
     overlayBtn('reset-btn-all', 'RESET ALL', function () {
       season = null;
       seasonStartDivisionAssignments = null;
+      superLeague = false;
       humanDivision = 0;
       currentDivisionAssignments = INITIAL_DIVISIONS.slice();
       saveProgress();
@@ -1334,6 +1366,10 @@
         if (e.key === 'Backspace' || e.key === 'Escape') {
           e.preventDefault(); handleMenuDuringRace();
         }
+        if (cheatAvailable && (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE)) {
+          if (e.key === 'w' || e.key === 'W') { e.preventDefault(); cheatWin(); }
+          if (e.key === 'l' || e.key === 'L') { e.preventDefault(); cheatLose(); }
+        }
         return;
       }
 
@@ -1531,6 +1567,7 @@
 
   function boot() {
     loadProgress();
+    cheatAvailable = (typeof Module._jsCheatWin === 'function');
     createUI();
     ready = true;
     uiMode = UI_MAIN_MENU;
