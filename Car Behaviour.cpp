@@ -151,8 +151,9 @@ static long accelerate, brake;
 
 static long accelerating = FALSE;	// to remember previous control state
 
-static long engine_power = 240;		// (240 standard, 320 super)
-static long boost_unit_value = 16;	// (16 standard, 12 super)
+static long engine_power = 240;
+static long boost_unit_value = 16;
+static long road_cushion_value = 0;
 
 static long left_right_value;
 static long engine_z_acceleration;
@@ -360,8 +361,9 @@ void ResetPlayer (void)
 
 	accelerating = FALSE;
 
-	engine_power = 240;		// (240 standard, 320 super)
-	boost_unit_value = 16;	// (16 standard, 12 super)
+	engine_power = super_league_mode ? 320 : 240;
+	boost_unit_value = super_league_mode ? 12 : 16;
+	road_cushion_value = super_league_mode ? 1 : 0;
 
 	// calculated
 	left_right_value = 0;
@@ -2039,9 +2041,8 @@ static void CalculateGravityAcceleration (void)
 
 static long damaged_limit = 10;	// Actually track/league dependant (could add to track data)
 
-	// NOTE: road_cushion_value is 0 for standard league and 1 for super league
-	//		 fourteen_frames_elapsed has value of 0 or -1 (set)
-static long road_cushion_value = 0, fourteen_frames_elapsed = 0;
+	// fourteen_frames_elapsed has value of 0 or -1 (set)
+static long fourteen_frames_elapsed = 0;
 
 
 // following are only global due to use by two functions - could be passed in instead

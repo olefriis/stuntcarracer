@@ -273,7 +273,7 @@
     return ptr ? Module.UTF8ToString(ptr) : '';
   }
 
-  function selectTrack(index)  { Module._jsSelectTrack(index); }
+  function selectTrack(index)  { Module._jsSetSuperLeague(superLeague ? 1 : 0); Module._jsSelectTrack(index); }
   function startPreview()      { Module._jsStartPreview(); }
   function startGame(opp)      { Module._jsStartGame(opp); }
   function goToMenu()          { Module._jsGoToMenu(); }
@@ -729,8 +729,9 @@
     SCR_Multiplayer.onMessage = mpReceiveState;
     SCR_Multiplayer.onReliableMessage = function (msg) {
       if (msg.type === 'track' && !SCR_Multiplayer.isHost()) {
-        // Host selected a track
+        // Host selected a track — use host's super league mode
         mpTrackIndex = msg.trackIndex;
+        superLeague = !!msg.superLeague;
         selectTrack(mpTrackIndex);
         // Start the race
         hideOverlay();
@@ -894,7 +895,7 @@
     });
     overlayBtn('mp-btn-go', 'GO', function () {
       // Tell the joiner which track
-      SCR_Multiplayer.sendReliable({ type: 'track', trackIndex: mpTrackIndex });
+      SCR_Multiplayer.sendReliable({ type: 'track', trackIndex: mpTrackIndex, superLeague: superLeague });
       // Start our own race
       hideOverlay();
       fadeAndDo(function () {
@@ -1568,6 +1569,8 @@
   function boot() {
     loadProgress();
     cheatAvailable = (typeof Module._jsCheatWin === 'function');
+    // Push saved super league state to C++ and rebuild initial track
+    selectTrack(0);
     createUI();
     ready = true;
     uiMode = UI_MAIN_MENU;

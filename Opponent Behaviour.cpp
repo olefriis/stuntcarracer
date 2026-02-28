@@ -305,6 +305,8 @@ static void ResetOpponent (void)
 	opponents_z_speed = 0;
 	opponents_required_z_speed_reached = FALSE;
 
+	opp_engine_power = super_league_mode ? 314 : 236;
+
 	player_close_to_opponent = FALSE;
 	opponent_behind_player = FALSE;
 	return;

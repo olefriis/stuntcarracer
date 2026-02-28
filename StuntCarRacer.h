@@ -55,6 +55,9 @@ extern void SetSolidColour (long colour_index);
 extern void SetLineColour (long colour_index);
 extern void SetTextureColour (long colour_index);
 
+// Super league mode (set from JS before track loading)
+extern bool super_league_mode;
+
 // Debug
 extern long VALUE1, VALUE2, VALUE3;
 

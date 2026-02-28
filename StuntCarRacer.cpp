@@ -54,6 +54,8 @@ IDirect3DTexture9 *g_pRoadTexture[NUM_ROAD_TEXTURES];
 static long frameGap = DEFAULT_FRAME_GAP;
 static bool bFrameMoved = FALSE;
 
+bool super_league_mode = false;
+
 bool bShowStats = FALSE;
 bool bNewGame = FALSE;
 bool bPaused = FALSE;
@@ -1747,6 +1749,14 @@ extern bool opponent_behind_player;
 
 extern "C" {
 
+// Set super league mode. Must be called before jsSelectTrack so track
+// colours are built correctly, and before jsStartGame/jsStartPreview
+// so that engine power and boost values are applied after ResetPlayer.
+EMSCRIPTEN_KEEPALIVE
+void jsSetSuperLeague(int on) {
+    super_league_mode = (on != 0);
+}
+
 // Select and load a track by index (0–7). Returns 1 on success, 0 on failure.
 EMSCRIPTEN_KEEPALIVE
 int jsSelectTrack(int trackIndex) {
@@ -1783,7 +1793,7 @@ void jsStartGame(int opponentId) {
     ResetLapData(PLAYER);
     gameStartTime = DXUTGetTime();
     gameEndTime = 0;
-    boostReserve = StandardBoost;
+    boostReserve = super_league_mode ? SuperBoost : StandardBoost;
     boostUnit = 0;
     bPlayerPaused = bOpponentPaused = FALSE;
     playerWrecked = false;
@@ -1828,7 +1838,7 @@ int jsGetBoostReserve() { return (int)boostReserve; }
 
 // Get max boost
 EMSCRIPTEN_KEEPALIVE
-int jsGetBoostMax() { return (int)StandardBoost; }
+int jsGetBoostMax() { return (int)(super_league_mode ? SuperBoost : StandardBoost); }
 
 // Get current damage (0–255)
 EMSCRIPTEN_KEEPALIVE

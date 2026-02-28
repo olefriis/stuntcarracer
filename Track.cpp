@@ -1362,7 +1362,7 @@ long ConvertAmigaTrack( long track )
 			{
 			// odd numbered section (light)
 			roadColour = SCR_BASE_COLOUR + 2;
-			sidesColour = SCR_BASE_COLOUR + 10;		// 8 for SUPER LEAGUE
+			sidesColour = SCR_BASE_COLOUR + (super_league_mode ? 8 : 10);
 			}
 		else
 			{
