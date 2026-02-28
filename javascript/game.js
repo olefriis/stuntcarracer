@@ -110,7 +110,34 @@
   // ── Season state ───────────────────────────────────────────
   var season = null;
   var humanDivision = 0;
-  var currentDivAssign = INITIAL_DIVISIONS.slice();
+  var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
+  var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
+
+  var STORAGE_KEY = 'scr_progress';
+
+  function saveProgress() {
+    try {
+      var data = {
+        humanDivision: humanDivision,
+        currentDivisionAssignments: currentDivisionAssignments,
+        season: season,
+        seasonStartDivisionAssignments: seasonStartDivisionAssignments
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) { /* localStorage unavailable */ }
+  }
+
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (data.humanDivision != null) humanDivision = data.humanDivision;
+      if (data.currentDivisionAssignments) currentDivisionAssignments = data.currentDivisionAssignments;
+      if (data.season) season = data.season;
+      if (data.seasonStartDivisionAssignments) seasonStartDivisionAssignments = data.seasonStartDivisionAssignments;
+    } catch (e) { /* ignore corrupt data */ }
+  }
 
   function createNewSeason(divAssign) {
     // divAssign: array[12], index = driverID, value = division (0-3)
@@ -474,11 +501,11 @@
       driverName(race.driverA) + ' <span class="overlay-matchup-vs">vs</span> ' +
       driverName(race.driverB) + '</div>';
     h += '<div id="s-btn-race" class="overlay-button">Race</div>';
-    h += '<div id="s-btn-quit" class="overlay-button overlay-button-secondary">Quit Season</div>';
+    h += '<div id="s-btn-quit" class="overlay-button overlay-button-secondary">Pause Season</div>';
     showOverlay(h);
 
     overlayBtn('s-btn-race', 'RACE', beginSeasonRace);
-    overlayBtn('s-btn-quit', 'QUIT', quitSeason);
+    overlayBtn('s-btn-quit', 'PAUSE', pauseSeason);
   }
 
   function beginSeasonRace() {
@@ -519,6 +546,7 @@
 
   function advanceSeason() {
     season.currentRace++;
+    saveProgress();
     if (season.currentRace >= 6) {
       showStandings();
     } else {
@@ -538,7 +566,7 @@
       na[sH[0]] = d + 1;
       na[sA[sA.length - 1]] = d;
     }
-    currentDivAssign = na;
+    currentDivisionAssignments = na;
     humanDivision = na[HUMAN_PLAYER];
 
     var h = '<div class="overlay-title">' + divLabel(di) + ' Standings</div>';
@@ -588,6 +616,8 @@
 
   function finishSeason() {
     season = null;
+    seasonStartDivisionAssignments = null;
+    saveProgress();
     hideOverlay();
     goToMenu();
     uiMode = UI_MAIN_MENU;
@@ -619,6 +649,7 @@
     race.played = true;
     season.points[race.winnerDriver].wins++;
     season.points[race.bestLapDriver].bestLaps++;
+    saveProgress();
 
     fadeAndDo(function () {
       goToMenu();
@@ -626,8 +657,8 @@
     });
   }
 
-  function quitSeason() {
-    season = null;
+  function pauseSeason() {
+    // Preserve season state — player can resume later
     hideOverlay();
     goToMenu();
     uiMode = UI_MAIN_MENU;
@@ -975,10 +1006,20 @@
   // ── Main menu screen ──
   function showMainMenu() {
     var h = '<div class="overlay-title-large">STUNT CAR RACER</div>';
-    h += '<div class="overlay-subtitle" style="margin-bottom:3vh;">' + divLabel(humanDivision) + '</div>';
+    // Division subtitle — show race progress if mid-season
+    var divisionText = divLabel(humanDivision);
+    if (season) {
+      divisionText += ', race ' + (season.currentRace + 1) + ' of 6';
+    }
+    h += '<div class="overlay-subtitle" style="margin-bottom:3vh;">' + divisionText + '</div>';
     h += '<div id="mm-btn-practise" class="overlay-button">Practise</div><br>';
-    h += '<div id="mm-btn-season" class="overlay-button">Start the Racing Season</div><br>';
+    var seasonLabel = season ? 'Resume the Racing Season' : 'Start the Racing Season';
+    h += '<div id="mm-btn-season" class="overlay-button">' + seasonLabel + '</div><br>';
     h += '<div id="mm-btn-twoplayer" class="overlay-button">Two Players</div>';
+    // Reset button — only show if there is progress to reset
+    if (season || humanDivision > 0) {
+      h += '<div id="mm-btn-reset" class="overlay-button overlay-button-secondary" style="margin-top:2vh;">Reset Progress</div>';
+    }
     h += '<div id="mm-btn-credits" class="overlay-button credits-btn">?</div>';
     showOverlay(h);
     overlayBtn('mm-btn-practise', 'PRACTISE', function () {
@@ -987,17 +1028,67 @@
     });
     overlayBtn('mm-btn-season', 'SEASON', function () {
       hideOverlay();
-      fadeAndDo(function () {
-        season = createNewSeason(currentDivAssign.slice());
-        showSeasonOverview();
-      });
+      if (season) {
+        // Resume existing season
+        showPreRace();
+      } else {
+        fadeAndDo(function () {
+          seasonStartDivisionAssignments = currentDivisionAssignments.slice();
+          season = createNewSeason(currentDivisionAssignments.slice());
+          saveProgress();
+          showSeasonOverview();
+        });
+      }
     });
     overlayBtn('mm-btn-twoplayer', 'TWO PLAYERS', function () {
       hideOverlay();
       showMpRoleSelect();
     });
+    overlayBtn('mm-btn-reset', 'RESET', function () {
+      showResetOptions();
+    });
     overlayBtn('mm-btn-credits', 'CREDITS', function () {
       showCredits();
+    });
+  }
+
+  function showResetOptions() {
+    // If player has progressed beyond Division 4, offer two choices
+    var canResetSeason = season && seasonStartDivisionAssignments;
+    var canResetAll = humanDivision > 0 || season;
+    var h = '<div class="overlay-title">Reset Progress</div>';
+    if (canResetSeason && humanDivision > 0) {
+      h += '<div class="overlay-description">Choose what to reset:</div>';
+      h += '<div id="reset-btn-season" class="overlay-button">Reset Current Season</div>';
+      h += '<div class="overlay-detail">Restart the season in ' + divLabel(humanDivision) + '</div><br>';
+      h += '<div id="reset-btn-all" class="overlay-button">Reset Everything</div>';
+      h += '<div class="overlay-detail">Go back to Division 4</div>';
+    } else {
+      h += '<div class="overlay-description">This will reset all progress' +
+        (humanDivision > 0 ? ' and return you to Division 4' : '') + '.</div>';
+      h += '<div id="reset-btn-all" class="overlay-button">Reset</div>';
+    }
+    h += '<div id="reset-btn-cancel" class="overlay-button overlay-button-secondary" style="margin-top:2vh;">Cancel</div>';
+    showOverlay(h);
+    overlayBtn('reset-btn-season', 'RESET SEASON', function () {
+      // Reset to start of current season
+      currentDivisionAssignments = seasonStartDivisionAssignments.slice();
+      humanDivision = currentDivisionAssignments[HUMAN_PLAYER];
+      season = null;
+      seasonStartDivisionAssignments = null;
+      saveProgress();
+      showMainMenu();
+    });
+    overlayBtn('reset-btn-all', 'RESET ALL', function () {
+      season = null;
+      seasonStartDivisionAssignments = null;
+      humanDivision = 0;
+      currentDivisionAssignments = INITIAL_DIVISIONS.slice();
+      saveProgress();
+      showMainMenu();
+    });
+    overlayBtn('reset-btn-cancel', 'CANCEL', function () {
+      showMainMenu();
     });
   }
 
@@ -1048,6 +1139,7 @@
         race.played = true;
         season.points[opp].wins++;
         season.points[opp].bestLaps++;
+        saveProgress();
         goToMenu();
         showRaceResult(race);
       } else {
@@ -1158,7 +1250,7 @@
           if (btns.length > 0) btns[0].click();
           return;
         }
-        if (e.key === 'Escape') { e.preventDefault(); quitSeason(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); pauseSeason(); return; }
       }
 
       // Multiplayer overlays: Escape → back/cancel
@@ -1438,6 +1530,7 @@
   // ══════════════════════════════════════════════════════════════
 
   function boot() {
+    loadProgress();
     createUI();
     ready = true;
     uiMode = UI_MAIN_MENU;
