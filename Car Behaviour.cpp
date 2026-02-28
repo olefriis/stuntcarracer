@@ -110,6 +110,7 @@ long front_left_damage = 0,
 	 rear_damage = 0;
 long damaged = 0;
 long new_damage = 0;
+long damage_hole_position = 10;  // 10 = fully intact, 0 = all holes
 
 long car_collision_x_acceleration,
 	 car_collision_y_acceleration,
@@ -432,6 +433,7 @@ void ResetPlayer (void)
 
 	new_damage = 0;
 	smashed_countdown = 0;
+	// Note: damage_hole_position is NOT reset here — it persists across races
 
 	// calculated
 	car_collision_x_acceleration = 0;
@@ -4076,9 +4078,8 @@ void UpdateDamage (void)
 
 	if (damage_value < 0x1400) goto PlayCreakSound;
 
-	// if (damage.hole.position == 0) goto PlayCreakSound;
-	//--damage.hole.position
-	// copy 'damage hole smashed' graphic to damage.hole.position
+	if (damage_hole_position <= 0) goto PlayCreakSound;
+	--damage_hole_position;
 
 	smashed_countdown = 69;
 

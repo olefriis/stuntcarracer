@@ -84,6 +84,7 @@ extern long players_distance_into_section;
 extern long players_road_x_position;
 extern long player_z_speed;
 extern long new_damage;
+extern long damage_hole_position;
 bool playerWrecked = false;
 bool soloMode = false;
 bool twoPlayerMode = false;
@@ -1270,8 +1271,8 @@ void RenderText( double fTime )
 		case GAME_OVER:
 			txtHelper.End();
 
-			// Detect wrecked (max damage)
-			if (!raceFinished && GameMode == GAME_IN_PROGRESS && new_damage >= 255)
+			// Detect wrecked (damage threshold $F0 = 240, matching Amiga original)
+			if (!raceFinished && GameMode == GAME_IN_PROGRESS && new_damage >= 240)
 			{
 				raceFinished = true;
 				raceWon = false;
@@ -1843,6 +1844,18 @@ int jsGetBoostMax() { return (int)(super_league_mode ? SuperBoost : StandardBoos
 // Get current damage (0–255)
 EMSCRIPTEN_KEEPALIVE
 int jsGetDamage() { return (int)new_damage; }
+
+// Get damage hole position (10 = fully intact, 0 = all holes)
+EMSCRIPTEN_KEEPALIVE
+int jsGetDamageHolePosition() { return (int)damage_hole_position; }
+
+// Set damage hole position (called by JS before race to restore persistent holes)
+EMSCRIPTEN_KEEPALIVE
+void jsSetDamageHolePosition(int pos) {
+    if (pos < 0) pos = 0;
+    if (pos > 10) pos = 10;
+    damage_hole_position = pos;
+}
 
 // Get player lap number
 EMSCRIPTEN_KEEPALIVE
