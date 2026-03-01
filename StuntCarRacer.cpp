@@ -8,7 +8,6 @@
 //--------------------------------------------------------------------------------------
 
 #include "dxstdafx.h"
-#include "resource.h"
 
 #include "StuntCarRacer.h"
 #include "3D Engine.h"
