@@ -386,16 +386,24 @@
     // ── HUD: damage bar at top ──
     createHudBar('tc-hud-damage', '\u26A0\uFE0F');
 
-    // Add holes overlay to the damage bar (dark region on the right)
+    // Add holes overlay to the damage bar (individual hole markers on the right)
     (function () {
       var track = document.querySelector('#tc-hud-damage .hud-track');
       if (track) {
-        var holes = document.createElement('div');
-        holes.id = 'tc-hud-damage-holes';
-        holes.style.cssText = 'position:absolute;right:0;top:0;height:100%;background:rgba(0,0,0,0.7);pointer-events:none;';
-        holes.style.width = '0%';
         track.style.position = 'relative';
-        track.appendChild(holes);
+        var container = document.createElement('div');
+        container.id = 'tc-hud-damage-holes';
+        container.style.cssText = 'position:absolute;right:0;top:0;height:100%;pointer-events:none;display:flex;flex-direction:row-reverse;';
+        container.style.width = '100%';
+        // Create 10 hole marker slots (right-to-left)
+        for (var i = 0; i < 10; i++) {
+          var slot = document.createElement('div');
+          slot.className = 'damage-hole-slot';
+          slot.style.cssText = 'width:10%;height:100%;box-sizing:border-box;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);border-left:1px solid rgba(255,60,60,0.4);';
+          slot.innerHTML = '<span style="color:rgba(255,80,80,0.85);font-size:min(2vh,12px);font-weight:bold;line-height:1;text-shadow:0 0 3px rgba(0,0,0,0.8);">✕</span>';
+          container.appendChild(slot);
+        }
+        track.appendChild(container);
       }
     })();
 
@@ -1567,8 +1575,11 @@
       var dh = document.getElementById('tc-hud-damage-holes');
       if (dh) {
         var holePos = getDamageHolePosition();
-        var holePct = Math.round(100 * (10 - holePos) / 10);
-        dh.style.width = holePct + '%';
+        var numHoles = 10 - holePos; // how many holes are punched
+        var slots = dh.children;
+        for (var hi = 0; hi < slots.length; hi++) {
+          slots[hi].style.display = (hi < numHoles) ? 'flex' : 'none';
+        }
       }
 
       // Vertical speed bar
