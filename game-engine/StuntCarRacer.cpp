@@ -1793,7 +1793,7 @@ void jsStartGame(int opponentId) {
     ResetLapData(PLAYER);
     gameStartTime = DXUTGetTime();
     gameEndTime = 0;
-    boostReserve = super_league_mode ? SuperBoost : StandardBoost;
+    boostReserve = (super_league_mode ? SuperBoost : StandardBoost) - 1;
     boostUnit = 0;
     bPlayerPaused = bOpponentPaused = FALSE;
     playerWrecked = false;
@@ -1838,7 +1838,7 @@ int jsGetBoostReserve() { return (int)boostReserve; }
 
 // Get max boost
 EMSCRIPTEN_KEEPALIVE
-int jsGetBoostMax() { return (int)(super_league_mode ? SuperBoost : StandardBoost); }
+int jsGetBoostMax() { return (int)((super_league_mode ? SuperBoost : StandardBoost) - 1); }
 
 // Get current damage (0–255)
 EMSCRIPTEN_KEEPALIVE

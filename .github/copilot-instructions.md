@@ -25,6 +25,8 @@ and a simple Sinatra-based web service (in the `signaling` folder) for signaling
 * `Reference only/` — Original Amiga 68000 assembly source for reference.
 * `Makefile` — Emscripten build system.
 * `build-and-serve.sh` — Build + local dev server helper.
+* `gameplay.md`- Gameplay notes and observations. Consult this on rules, mechanics,
+  and behavior of the original game.
 
 # Building
 

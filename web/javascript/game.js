@@ -116,8 +116,8 @@
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
   var seasonStartDamageHolePosition = null; // hole position snapshot at season start
 
-  // Holes repaired at end of season based on standings position (1st–4th)
-  var REPAIR_TABLE = [3, 2, 1, 0];
+  // Holes repaired at end of season based on overall position across all 12 players
+  var REPAIR_TABLE = [3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0];
 
   var STORAGE_KEY = 'scr_progress';
 
@@ -231,6 +231,22 @@
       return season.points[b].wins - season.points[a].wins;
     });
     return players;
+  }
+
+  function overallStandings() {
+    var all = [];
+    for (var d = 0; d < 4; d++) {
+      var st = divStandings(d);
+      for (var i = 0; i < st.length; i++) {
+        all.push({ player: st[i], div: d, rank: i, pts: driverPoints(st[i]) });
+      }
+    }
+    all.sort(function (a, b) {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.div !== a.div) return b.div - a.div;
+      return a.rank - b.rank;
+    });
+    return all.map(function (e) { return e.player; });
   }
 
   function divLabel(idx) {
@@ -624,9 +640,10 @@
       damageHolePosition = 10; // full repair on super league promotion
     } else {
       humanDivision = na[HUMAN_PLAYER];
-      // Repair holes based on standings position
-      var playerPosition = st.indexOf(HUMAN_PLAYER);
-      var repairAmount = REPAIR_TABLE[playerPosition] || 0;
+      // Repair holes based on overall position across all divisions
+      var overall = overallStandings();
+      var overallPosition = overall.indexOf(HUMAN_PLAYER);
+      var repairAmount = REPAIR_TABLE[overallPosition] || 0;
       damageHolePosition = Math.min(10, damageHolePosition + repairAmount);
     }
     currentDivisionAssignments = na;
@@ -681,8 +698,8 @@
     if (enteringSuperLeague) {
       h += '<div class="overlay-detail">\uD83D\uDD27 Car fully repaired!</div>';
     } else {
-      var playerPosition = st.indexOf(HUMAN_PLAYER);
-      var repairAmount = REPAIR_TABLE[playerPosition] || 0;
+      var overallPosition = overallStandings().indexOf(HUMAN_PLAYER);
+      var repairAmount = REPAIR_TABLE[overallPosition] || 0;
       if (repairAmount > 0) {
         h += '<div class="overlay-detail">\uD83D\uDD27 ' + repairAmount + ' hole' + (repairAmount > 1 ? 's' : '') + ' repaired</div>';
       } else {
