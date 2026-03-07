@@ -8,17 +8,20 @@
 #
 # Requires Emscripten 5.0+ (emcc on PATH).
 
+ENGINE = game-engine
+WEB    = web
+
 SOURCES = \
-	StuntCarRacer.cpp \
-	dxstdafx.cpp \
-	Car\ Behaviour.cpp \
-	3D\ Engine.cpp \
-	Opponent\ Behaviour.cpp \
-	Car.cpp \
-	Track.cpp \
-	wavefunctions.cpp \
-	Backdrop.cpp \
-	$(wildcard Substitutes/*.cpp)
+	$(ENGINE)/StuntCarRacer.cpp \
+	$(ENGINE)/dxstdafx.cpp \
+	$(ENGINE)/Car\ Behaviour.cpp \
+	$(ENGINE)/3D\ Engine.cpp \
+	$(ENGINE)/Opponent\ Behaviour.cpp \
+	$(ENGINE)/Car.cpp \
+	$(ENGINE)/Track.cpp \
+	$(ENGINE)/wavefunctions.cpp \
+	$(ENGINE)/Backdrop.cpp \
+	$(wildcard $(ENGINE)/Substitutes/*.cpp)
 
 EMCC_FLAGS = \
 	-O2 \
@@ -31,9 +34,9 @@ EMCC_FLAGS = \
 	-s USE_SDL_IMAGE=2 \
 	-s SDL2_IMAGE_FORMATS='["bmp"]' \
 	-s MAX_WEBGL_VERSION=2 \
-	--embed-file Tracks \
-	--embed-file Bitmap \
-	--embed-file Sounds
+	--embed-file $(ENGINE)/Tracks@Tracks \
+	--embed-file $(ENGINE)/Bitmap@Bitmap \
+	--embed-file $(ENGINE)/Sounds@Sounds
 
 # Cheat mode: CHEAT=1 adds W/L keys to force win/loss during races
 comma := ,
@@ -48,9 +51,9 @@ DIST = dist
 # Static PWA assets to copy into dist/ for production builds
 PWA_ASSETS = manifest.json icon-192.png icon-512.png game.css
 
-# JavaScript sources (live in javascript/ but get copied flat into dist/)
-JS_SOURCES = javascript/sw.js javascript/multiplayer.js javascript/game.js
-JS_DIST    = $(patsubst javascript/%,$(DIST)/%,$(JS_SOURCES))
+# JavaScript sources (copied flat into dist/)
+JS_SOURCES = $(WEB)/javascript/sw.js $(WEB)/javascript/multiplayer.js $(WEB)/javascript/game.js
+JS_DIST    = $(patsubst $(WEB)/javascript/%,$(DIST)/%,$(JS_SOURCES))
 
 # ─── Targets ────────────────────────────────────────────────
 
@@ -60,26 +63,26 @@ all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS)) $(JS_DIST)
 
 debug: $(DIST)/source.html
 
-$(DIST)/source.html: $(SOURCES) custom_shell.html game.css $(JS_SOURCES) | $(DIST)
+$(DIST)/source.html: $(SOURCES) $(WEB)/custom_shell.html $(WEB)/game.css $(JS_SOURCES) | $(DIST)
 	@echo "Building…"
 	@if [ "$(MAKECMDGOALS)" = "debug" ]; then \
 		echo "  (debug build)"; \
 		emcc $(SOURCES) $(EMCC_FLAGS) -o $(DIST)/source.html; \
 	else \
 		echo "  (production build — using custom shell)"; \
-		emcc $(SOURCES) $(EMCC_FLAGS) --shell-file custom_shell.html -o $(DIST)/source.html; \
+		emcc $(SOURCES) $(EMCC_FLAGS) --shell-file $(WEB)/custom_shell.html -o $(DIST)/source.html; \
 	fi
 
-$(DIST)/%.json: %.json | $(DIST)
+$(DIST)/%.json: $(WEB)/%.json | $(DIST)
 	cp $< $@
 
-$(DIST)/%.js: javascript/%.js | $(DIST)
+$(DIST)/%.js: $(WEB)/javascript/%.js | $(DIST)
 	cp $< $@
 
-$(DIST)/%.css: %.css | $(DIST)
+$(DIST)/%.css: $(WEB)/%.css | $(DIST)
 	cp $< $@
 
-$(DIST)/%.png: %.png | $(DIST)
+$(DIST)/%.png: $(WEB)/%.png | $(DIST)
 	cp $< $@
 
 $(DIST):

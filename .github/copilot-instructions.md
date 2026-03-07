@@ -1,12 +1,8 @@
 # Overview
 
-This is a fork of a really awesome project that has taken the source code from the
-Amiga game Stunt Car Racer and made it work on Windows machines with DirectX. This
-fork intends to make it run in a browser using the Emscripten compiler.
-
-The changes in this fork revolve around creating a DirectX wrapper that mimics the
-DirectX API but translates calls to OpenGL. Emscripten then translages OpenGL to
-WebGL. In short, this project uses:
+The changes in the C++ code in this fork revolve around creating a DirectX wrapper
+that mimics the DirectX API but translates calls to OpenGL. Emscripten then
+translates OpenGL to WebGL. In short, this project uses:
 * OpenGL for graphics.
 * OpenAL for audio.
 * SDL for input handling.
@@ -14,11 +10,21 @@ WebGL. In short, this project uses:
 We want to change the original code as little as possible, so we are implementing
 the DirectX functions in a way that they can be called from the original game code.
 
-The DirectX (and other) wrappers are located in the `Substitutes` folder.
+The DirectX (and other) wrappers are located in the `game-engine/Substitutes` folder.
 
-This version of the game extends the C++ version with a tournament mode and a
-two-player mode. The two-player mode uses WebRTC for peer-to-peer communication,
+There's a two-player mode that uses WebRTC for peer-to-peer communication,
 and a simple Sinatra-based web service (in the `signaling` folder) for signaling.
+
+# Repository Structure
+
+* `game-engine/` — C++ source code, DirectX-to-OpenGL substitutes, and embedded
+  assets (Bitmap, Tracks, Sounds).
+* `web/` — Browser layer: HTML shell, CSS, JavaScript game logic, PWA manifest,
+  icons, and service worker.
+* `signaling/` — Sinatra-based WebRTC signaling server for two-player mode.
+* `Reference only/` — Original Amiga 68000 assembly source for reference.
+* `Makefile` — Emscripten build system.
+* `build-and-serve.sh` — Build + local dev server helper.
 
 # Building
 
@@ -33,7 +39,7 @@ make
 ```
 
 This will create a `dist/` directory with everything required to run the game.
-The default build uses `custom_shell.html` for a fullscreen layout and also
+The default build uses `web/custom_shell.html` for a fullscreen layout and also
 copies PWA assets (manifest, service worker, icons) into `dist/`.
 
 You can serve the `dist/` folder with any HTTP server, or just run:
@@ -64,7 +70,7 @@ The production build includes a service worker (`sw.js`) that caches assets for
 offline/PWA use. When testing changes on a device (especially iOS simulators),
 the old cached files can prevent new code from loading.
 
-To force a fresh load, bump the cache version in `sw.js`:
+To force a fresh load, bump the cache version in `web/javascript/sw.js`:
 
 ```js
 var CACHE_NAME = 'scr-v6'; // increment the number
