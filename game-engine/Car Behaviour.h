@@ -65,6 +65,11 @@ extern void UpdateLapData (void);
 
 extern void GetPlayerWheelHeights (long *fl, long *fr, long *r);
 
+extern bool IsCarOnChains (void);
+extern long GetCarOnChainsCountdown (void);
+extern long GetChainSwingFromLeft (void);
+extern bool IsChainBoostHintVisible (void);
+
 #ifdef USE_AMIGA_RECORDING
 extern void RequestGameReplay (void);
 extern void RequestStoredReplay (void);

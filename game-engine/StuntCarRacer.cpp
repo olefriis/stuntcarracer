@@ -1985,6 +1985,18 @@ void jsSetOpponentState(int roadSection, int distIntoSection, int roadXPos,
                             zSpeed, playerFL, playerFR, playerR);
 }
 
+EMSCRIPTEN_KEEPALIVE
+int jsIsCarOnChains() { return IsCarOnChains() ? 1 : 0; }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetChainCountdown() { return (int)GetCarOnChainsCountdown(); }
+
+EMSCRIPTEN_KEEPALIVE
+int jsGetChainSwingFromLeft() { return (int)GetChainSwingFromLeft(); }
+
+EMSCRIPTEN_KEEPALIVE
+int jsIsChainBoostHintVisible() { return IsChainBoostHintVisible() ? 1 : 0; }
+
 } // extern "C"
 
 

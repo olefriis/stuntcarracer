@@ -85,7 +85,7 @@ extern bool bTestKey;
 
 #define	OFF_ROAD_HEIGHT	0x1000
 
-#define	OFF_TRACK_LIMIT	64		// count after which player is put back on track
+#define	OFF_TRACK_LIMIT	30		// count after which player is put back on track
 
 #define	WRECKED			(wreck_wheel_height_reduction != 0)
 #define	NOT_WRECKED		(wreck_wheel_height_reduction == 0)
@@ -184,10 +184,38 @@ static long wreck_wheel_height_reduction = 0;		// 0x200 if wrecked
 	// set the on_chains flag to FALSE for now (won't implement chains at first)
 static long on_chains = FALSE;
 
+// Chain/crane lifting mechanic state
+static long car_on_chains_countdown = 0;
+static long chain_swing_from_left = FALSE;    // TRUE = car lifts from the left side
+
+// Crane hook trajectory points (world coordinates)
+static long chain_ground_y = 0;             // ground level Y beside track
+static long chain_hover_y = 0;              // hover height while hanging (= track surface Y)
+static long chain_crane_top_y = 0;          // top of crane lift Y
+static long chain_start_x = 0;              // starting world X (ground, to the side)
+static long chain_start_z = 0;              // starting world Z (ground, to the side)
+static long chain_track_x = 0;              // target world X (above track center)
+static long chain_track_z = 0;              // target world Z (above track center)
+
+// Lateral unit vector (from track center toward start position, normalised * PRECISION)
+static long chain_lat_unit_x = 0;
+static long chain_lat_unit_z = 0;
+
+// Pendulum state (double precision, physics-based)
+static double chain_pend_theta = 0.0;       // pendulum angle from vertical (radians, + = toward start side)
+static double chain_pend_omega = 0.0;       // pendulum angular velocity (radians/frame)
+static double chain_crane_prev_lat = 0.0;   // previous frame crane lateral position (world units)
+static double chain_crane_prev_lat_vel = 0.0; // previous frame crane lateral velocity (world units/frame)
+
+static bool chain_is_recovery = false;       // TRUE = skip lift/swing, start directly above track
+static bool chain_boost_pressed = false;     // set by CarControl, cleared by LiftCarOntoTrack
+static bool chain_boost_was_released = false; // tracks boost was released once while hanging
+
 static long player_distance_off_road;	// used to determine the value below
 static long off_map_status = 0;	// not set exactly like Amiga StuntCarRacer
 
 static long off_track_count = 0;
+static bool off_track_went_left = false;  // set at the first off-track frame
 
 static long gravity_x_acceleration,
 			gravity_y_acceleration,
@@ -318,7 +346,7 @@ static void CalcCurveMeasurements (long piece,
 								   long *radius_out,
 								   double *distance_from_centre_out);
 
-static void PositionCarAbovePiece (long piece);
+static void PositionCarAbovePiece (long piece, bool isRecovery, long off_x = 0, long off_z = 0, long off_y_angle = 0);
 static void UpdateEngineRevs (void);
 static void DrawDustClouds (void);
 static void DrawSparks (void);
@@ -399,6 +427,14 @@ void ResetPlayer (void)
 
 	// set the on_chains flag to FALSE for now (won't implement chains at first)
 	on_chains = FALSE;
+	car_on_chains_countdown = 0;
+	chain_pend_theta = 0.0;
+	chain_pend_omega = 0.0;
+	chain_crane_prev_lat = 0.0;
+	chain_crane_prev_lat_vel = 0.0;
+	chain_is_recovery = false;
+	chain_boost_pressed = false;
+	chain_boost_was_released = false;
 
 	// calculated
 	player_distance_off_road = 0;
@@ -521,6 +557,11 @@ void CarBehaviour (DWORD input,
 	    (bNewGame) ||
 		(ReplayRequested))
 		{
+		// Save position and heading before ResetPlayer zeroes them — needed for recovery side detection.
+		long saved_player_x = player_x;
+		long saved_player_z = player_z;
+		long saved_player_y_angle = player_y_angle;
+
 		// preserve damage state when car is put back on track (original Amiga behaviour)
 		long save_front_left_damage = front_left_damage;
 		long save_front_right_damage = front_right_damage;
@@ -549,11 +590,13 @@ void CarBehaviour (DWORD input,
 
 		if (off_track_count > OFF_TRACK_LIMIT)
 			{
-			PositionCarAbovePiece(player_current_piece);
+			// player_x/z are zeroed by ResetPlayer; pass the off-track position
+			// and heading explicitly so PositionCarAbovePiece can detect which side to use.
+			PositionCarAbovePiece(player_current_piece, true, saved_player_x, saved_player_z, saved_player_y_angle);
 			}
 		else
 			{
-			PositionCarAbovePiece(PlayersStartPiece);
+			PositionCarAbovePiece(PlayersStartPiece, false);
 			}
 		drop_start_done = FALSE;
 
@@ -860,6 +903,23 @@ static void CarControl (DWORD input)
 			   accelerate,
 			   brake);
 
+	// Track boost press/release for crane release mechanic
+	{
+		bool boost_key_down = (boost != 0);
+		if (on_chains)
+			{
+			if (!boost_key_down)
+				chain_boost_was_released = true;
+			else if (chain_boost_was_released)
+				chain_boost_pressed = true;
+			}
+		else
+			{
+			chain_boost_was_released = false;
+			chain_boost_pressed = false;
+			}
+	}
+
 #ifdef PLAY_AMIGA_RECORDING
 	GetRecordedAmigaWord(&left_right_value);
 	GetRecordedAmigaWord(&engine_z_acceleration);
@@ -944,6 +1004,9 @@ static void CarMovement (void)
 	UpdatePlayersWorldSpeed();
 	UpdatePlayersPosition();
 
+	// Apply crane/chain lifting AFTER physics, so direct position overrides stick
+	LiftCarOntoTrack();
+
 #ifdef PLAY_AMIGA_RECORDING
 	if (StartOfAmigaRecording)
 	{
@@ -985,6 +1048,23 @@ static void CarMovement (void)
 
 	if ((off_map_status != 0) && (touching_road) && (player_y < 0x1000000))
 		{
+		if (off_track_count == 0)
+			{
+			// First frame off-track: record which side now, while the car is still
+			// right at the track edge.  After 50 frames the car travels so far that
+			// the late-frame geometry is unreliable (especially on curves).
+			long pc = player_current_piece;
+			long px = (Track[pc].x << LOG_CUBE_SIZE) + CUBE_SIZE/2;
+			long pz = (Track[pc].z << LOG_CUBE_SIZE) + CUBE_SIZE/2;
+			short sy, cy;
+			GetSinCos(player_y_angle, &sy, &cy);
+			// Cross product (forward × offset): positive = car is to the LEFT.
+			// forward=(sin_y,cos_y), offset=(dx,dz)  →  sin_y*dz - cos_y*dx
+			long long dx = (long long)player_x - (long long)px;
+			long long dz = (long long)player_z - (long long)pz;
+			long long lat = (long long)sy * dz - (long long)cy * dx;
+			off_track_went_left = (lat > 0);
+			}
 		off_track_count++;
 		smaller_limit_required = TRUE;
 		}
@@ -2145,9 +2225,6 @@ static void CarCollisionDetection (void)
 		}
 
 
-	// following function won't do anything at first
-	LiftCarOntoTrack();
-
 	car_to_road_collision_z_acceleration = car_collision_z_acceleration;
 
 	CarToCarCollision();
@@ -2402,7 +2479,224 @@ static void CalculateInclinationSinCos (long inclination_in,
 
 static void LiftCarOntoTrack (void)
 	{
-	return;
+	if (!on_chains || car_on_chains_countdown == 0) return;
+
+	extern bool soloMode;
+
+	// ── Constants ─────────────────────────────────────────────────────────────
+	const int    CD_TOTAL      = 70;   // total countdown for full lift sequence
+	const int    CD_HOVER      = 10;   // release window opens when countdown falls to this
+	const int    CD_REC_TOTAL  = 155;  // recovery: total countdown (~6.2 s at 25 fps)
+	const int    CD_REC_SWEEP  = 130;  // recovery: lateral sweep occupies first 25 frames
+	const int    CD_REC_HINT   = 105;  // recovery: "press boost" hint appears at this countdown
+
+	const double chain_len          = (double)0x80000;
+	const double crane_top_y        = (double)(chain_hover_y + (long)0xC0000);
+	const double crane_hover_y_hook = (double)(chain_hover_y) + chain_len * 0.20;
+	const double crane_start_y      = (double)(chain_ground_y) + chain_len;
+
+	const double lat_ux    = (double)chain_lat_unit_x / (double)PRECISION;
+	const double lat_uz    = (double)chain_lat_unit_z / (double)PRECISION;
+	const double total_lat = (double)(chain_start_x - chain_track_x) * lat_ux
+	                       + (double)(chain_start_z - chain_track_z) * lat_uz;
+
+	// ── Crane position ────────────────────────────────────────────────────────
+	double crane_x, crane_y, crane_z;
+	double crane_lat;
+
+	if (chain_is_recovery)
+		{
+		// Recovery: sweep horizontally from beside track to above track, then hover.
+		// Phase 1 (first 25 frames, cd CD_REC_TOTAL→CD_REC_SWEEP+1):
+		//   ease-in-out lateral sweep from total_lat → 0 at fixed hover height.
+		// Phase 2 (remaining 130 frames, cd CD_REC_SWEEP→1):
+		//   crane stationary above track; pendulum swings freely.
+		crane_y = crane_hover_y_hook;
+		if (car_on_chains_countdown > CD_REC_SWEEP)
+			{
+			double t  = (double)(CD_REC_TOTAL - car_on_chains_countdown)
+			          / (double)(CD_REC_TOTAL - CD_REC_SWEEP);
+			double f  = (1.0 - cos(PI * t)) / 2.0;
+			crane_lat = total_lat * (1.0 - f);
+			}
+		else
+			{
+			crane_lat = 0.0;
+			}
+		}
+	else
+		{
+		// Unified t ∈ [0,1] over CD_TOTAL frames.
+		// Each axis has its own [start, end] blend window — they OVERLAP so the
+		// crane naturally curves from rising into swinging without a dead stop.
+		//
+		//   Vertical rise:    t ∈ [0.00, 0.50]
+		//   Lateral sweep:    t ∈ [0.25, 0.70]  ← starts while still rising
+		//   Vertical lower:   t ∈ [0.60, 0.85]  ← starts before lateral fully done
+		//   Hover / release:  t > 0.85  → countdown ≈ CD_HOVER
+
+		const double T_RISE_END    = 0.33;  // lift completes at 33% (was 50%; now 50% faster)
+		const double T_LAT_START   = 0.15;  // lateral begins at 15% (overlaps with remaining lift)
+		const double T_LAT_END     = 0.70;
+		const double T_LOWER_START = 0.60;
+		const double T_LOWER_END   = 0.85;
+
+		double t = (double)(CD_TOTAL - car_on_chains_countdown) / (double)CD_TOTAL;
+
+		// Vertical rise component
+		double rise_tn = (t < T_RISE_END)    ? t / T_RISE_END    : 1.0;
+		double rise_f  = (1.0 - cos(PI * rise_tn)) / 2.0;
+
+		// Lateral sweep component
+		double lat_tn = (t < T_LAT_START) ? 0.0
+		              : (t < T_LAT_END)   ? (t - T_LAT_START) / (T_LAT_END - T_LAT_START)
+		              : 1.0;
+		double lat_f  = (1.0 - cos(PI * lat_tn)) / 2.0;
+
+		// Vertical lower component
+		double lower_tn = (t < T_LOWER_START) ? 0.0
+		                : (t < T_LOWER_END)   ? (t - T_LOWER_START) / (T_LOWER_END - T_LOWER_START)
+		                : 1.0;
+		double lower_f  = (1.0 - cos(PI * lower_tn)) / 2.0;
+
+		crane_y   = crane_start_y
+		          + (crane_top_y        - crane_start_y)      * rise_f
+		          + (crane_hover_y_hook - crane_top_y)        * lower_f;
+		crane_lat = total_lat * (1.0 - lat_f);
+		}
+
+	// Crane world X/Z from lateral component
+	crane_x = (double)chain_track_x + crane_lat * lat_ux;
+	crane_z = (double)chain_track_z + crane_lat * lat_uz;
+
+	// ── Pendulum physics ──────────────────────────────────────────────────────
+	// Driven pendulum: car hangs from crane hook on chain of length chain_len.
+	// theta = angle from vertical (radians), positive = toward start side.
+	//
+	// Equation of motion (non-inertial frame):
+	//   theta'' = -(g/L)*sin(theta) - (crane_lat_accel/L)*cos(theta) - damping*theta'
+	//
+	// g_per_L calibrated for a pleasant ~100-frame natural period.
+	// (Natural period T = 2*PI*sqrt(L/g); with chain_len=524288 and target T≈100
+	//  frames, g = L*(2PI/T)^2 ≈ 524288 * 0.00395 ≈ 2071)
+	// g_per_L = g / L (dimensionless for pendulum); using T_target ≈ 100:
+	//   g_per_L = (2*PI/T_target)^2 ≈ 0.00395
+	const double g_per_L  = 0.004;
+	const double damping  = 0.035;  // moderate damping so oscillations settle quickly
+
+	// Compute crane lateral velocity this frame
+	double crane_lat_vel = crane_lat - chain_crane_prev_lat;
+	double crane_lat_accel = crane_lat_vel - chain_crane_prev_lat_vel;
+	chain_crane_prev_lat = crane_lat;
+	chain_crane_prev_lat_vel = crane_lat_vel;
+
+	// Normalise crane_lat_accel by total_lat so the driving force is independent
+	// of world-unit scale (lateral sweep is ~23× chain_len, so raw /chain_len would
+	// give enormous force and many full rotations).
+	// DRIVE_K is reduced from 1.0 to 0.33 because the 3× faster crane speed
+	// means each frame's velocity change is ~3× larger — keeping DRIVE_K=1 would
+	// drive the pendulum 3× harder and produce an oversized swing.
+	const double DRIVE_K = 0.33;
+	double lat_accel_norm = (total_lat > 1.0) ? (crane_lat_accel / total_lat) : 0.0;
+
+	double alpha = -g_per_L * sin(chain_pend_theta)
+	             - lat_accel_norm * DRIVE_K * cos(chain_pend_theta)
+	             - damping * chain_pend_omega;
+
+	chain_pend_omega += alpha;
+	chain_pend_theta += chain_pend_omega;
+
+	// Clamp to ±PI/2 — a rigid chain physically cannot swing past horizontal
+	const double MAX_THETA = PI / 2.0;
+	if (chain_pend_theta >  MAX_THETA) { chain_pend_theta =  MAX_THETA; if (chain_pend_omega > 0) chain_pend_omega = 0; }
+	if (chain_pend_theta < -MAX_THETA) { chain_pend_theta = -MAX_THETA; if (chain_pend_omega < 0) chain_pend_omega = 0; }
+
+	// ── Car position from pendulum ────────────────────────────────────────────
+	double swing_lat  = chain_len * sin(chain_pend_theta);
+	double swing_down = chain_len * cos(chain_pend_theta);
+
+	player_x = (long)(crane_x + swing_lat * lat_ux);
+	player_z = (long)(crane_z + swing_lat * lat_uz);
+	player_y = (long)(crane_y - swing_down);
+
+	// ── Car tilt angle ────────────────────────────────────────────────────────
+	// Convert pendulum theta (radians) to game angle units [0..65535].
+	// Positive theta = car lags toward start side (away from track center).
+	// When the crane pulls toward the track, the car lags toward start and tilts
+	// so the far (track-centre) side dips — i.e. it rolls AWAY from start.
+	// from_right (start=RIGHT): lag right → roll right → positive tilt_game.
+	// from_left  (start=LEFT):  lag left  → roll left  → negative tilt_game.
+	double theta_game_units = chain_pend_theta * (double)MAX_ANGLE / (2.0 * PI);
+	long tilt_game = (long)theta_game_units;
+	// Positive theta = car lags toward start side.
+	// In-game: positive z_angle = roll right; negative (wrapped) = roll left.
+	// Car lags toward start → the chain pulls the attachment point toward the track
+	// → car body tilts AWAY from start (rolls toward track side).
+	// from_right (start=RIGHT): lag right → roll LEFT → negate tilt_game.
+	// from_left  (start=LEFT):  lag left  → roll RIGHT → keep tilt_game.
+	if (!chain_swing_from_left)
+		tilt_game = -tilt_game;
+	player_z_angle = (tilt_game + MAX_ANGLE) & (MAX_ANGLE - 1);
+
+	// Stabilise pitch -- no physical pitch forces act on the car while hanging
+	player_x_angle = 0;
+	player_x_rotation_speed = 0;
+	player_z_rotation_speed = 0;
+
+	// Override all physics forces while on chains
+	gravity_x_acceleration = 0;
+	gravity_y_acceleration = 0;
+	gravity_z_acceleration = 0;
+	car_collision_x_acceleration = 0;
+	car_collision_y_acceleration = 0;
+	car_collision_z_acceleration = 0;
+	player_world_x_speed = 0;
+	player_world_y_speed = 0;
+	player_world_z_speed = 0;
+
+	// ── Decrement and release logic ───────────────────────────────────────────
+	car_on_chains_countdown--;
+
+	// In recovery mode the release window opens once the sweep ends (cd ≤ CD_REC_SWEEP).
+	// In normal mode it only opens in the final CD_HOVER frames.
+	bool in_release_window = chain_is_recovery
+	                      ? (car_on_chains_countdown > 0 && car_on_chains_countdown <= CD_REC_SWEEP)
+	                      : (car_on_chains_countdown > 0 && car_on_chains_countdown <= CD_HOVER);
+
+	if (in_release_window)
+		{
+		bool should_release = false;
+
+		if (soloMode)
+			{
+			// Practice/solo mode: require explicit boost press to drop
+			if (chain_boost_pressed)
+				{
+				should_release = true;
+				chain_boost_pressed = false;
+				}
+			}
+		else
+			{
+			// Season / multiplayer: auto-drop partway through hover
+			if (car_on_chains_countdown <= 10)
+				should_release = true;
+			}
+
+		if (should_release)
+			{
+			on_chains = FALSE;
+			car_on_chains_countdown = 0;
+			off_map_status = 0;
+			}
+		}
+
+	// Force release when countdown is exhausted
+	if (car_on_chains_countdown == 0 && on_chains)
+		{
+		on_chains = FALSE;
+		off_map_status = 0;
+		}
 	}
 
 
@@ -3536,7 +3830,7 @@ set.players.restart.position
 extern unsigned char sections_car_can_be_put_on[];
 
 
-static void PositionCarAbovePiece (long piece)
+static void PositionCarAbovePiece (long piece, bool isRecovery, long off_x, long off_z, long off_y_angle)
 {
 	long piece_x, piece_z, height;
 
@@ -3603,25 +3897,128 @@ static void PositionCarAbovePiece (long piece)
 	player_y_angle &= (MAX_ANGLE - 1);
 
 	/*
-	 * Then player.to.side.of.road
+	 * Set up crane/chain lifting mechanic.
 	 *
-	 * Shift player in x direction by 160.
+	 * The car starts on the ground to one side of the track, then gets lifted
+	 * and swung over the track by an invisible crane.
 	 *
-	 * This is actually x = 160, z = 0 being rotated about the y axis and then added to the player x and z.
+	 * chain_track_x/z = the destination position (center of the track piece).
+	 * chain_start_x/z = the starting position (on the ground, to the side).
 	 */
 	short sin_y, cos_y;
 	GetSinCos(player_y_angle, &sin_y, &cos_y);
 
-	// Lateral offset: shift player to the side of the road.
-	// In two-player mode, host (side 0) goes further left, joiner (side 1) goes right.
+	// Determine which side the car starts from.
+	// In two-player mode, side 0 (host) lifts from left, side 1 (joiner) from right.
+	// In recovery mode, derive the side from the car's off-track position relative
+	// to the track center: project (car_off - track_center) onto the track-left
+	// vector (-cos_y, sin_y) in (x,z); positive = car is to the left.
+	// In normal (start-of-race) mode, always start from the right.
 	extern bool twoPlayerMode;
 	extern long twoPlayerSide;
-	long lateral = 160;
-	if (twoPlayerMode) {
-		lateral = (twoPlayerSide == 0) ? 260 : 60;
-	}
-	player_x += (lateral * (long)cos_y);
-	player_z -= (lateral * (long)sin_y);
+	bool from_left;
+	if (twoPlayerMode)
+		{
+		from_left = (twoPlayerSide == 0);
+		}
+	else if (isRecovery)
+		{
+		// Side was recorded at the first off-track frame when the car was still
+		// close to the track — reliable even through curves.
+		from_left = off_track_went_left;
+		}
+	else
+		{
+		from_left = false;  // race start: always from the right
+		}
+
+	chain_swing_from_left = from_left ? TRUE : FALSE;
+
+	chain_hover_y = height;  // = (raw_height + 0xc00) * 256
+
+	// Ground level = beside the track, at the base of the track side panels.
+	// (0x180000 = 1,572,864 units below hover)
+	chain_ground_y = chain_hover_y - 0x180000;
+
+	// Landing position: offset from track center toward the car's starting side,
+	// matching the original game's "player to side of road" placement (lateral=160).
+	// from_left  = land left of center;  from_right = land right of center.
+	const long land_lateral = 160;
+	if (from_left)
+		{
+		chain_track_x = player_x - (land_lateral * (long)cos_y);
+		chain_track_z = player_z + (land_lateral * (long)sin_y);
+		}
+	else
+		{
+		chain_track_x = player_x + (land_lateral * (long)cos_y);
+		chain_track_z = player_z - (land_lateral * (long)sin_y);
+		}
+
+	// Start position: 600 units further out from the landing position,
+	// in the same lateral direction.  Lateral unit vector points from landing
+	// position toward the start (i.e. away from track center).
+	const long start_extra = 600;
+	if (from_left)
+		{
+		chain_start_x = chain_track_x - (start_extra * (long)cos_y);
+		chain_start_z = chain_track_z + (start_extra * (long)sin_y);
+		chain_lat_unit_x = -(long)cos_y;   // points left = toward start
+		chain_lat_unit_z =  (long)sin_y;
+		}
+	else
+		{
+		chain_start_x = chain_track_x + (start_extra * (long)cos_y);
+		chain_start_z = chain_track_z - (start_extra * (long)sin_y);
+		chain_lat_unit_x =  (long)cos_y;   // points right = toward start
+		chain_lat_unit_z = -(long)sin_y;
+		}
+
+	// Place car at ground level to the side
+	player_x = chain_start_x;
+	player_z = chain_start_z;
+	player_y = chain_ground_y;
+
+	// Initialise chain lifting countdown and pendulum state
+	chain_is_recovery = isRecovery;
+	if (isRecovery)
+		{
+		// Recovery: sweep horizontally from beside track to above track, then dangle.
+		// Car hangs vertically below crane at chain_start position initially.
+		car_on_chains_countdown = 155;
+		player_x = chain_start_x;
+		player_z = chain_start_z;
+		player_y = chain_hover_y;
+		chain_pend_theta = 0.0;   // hanging vertically at the start
+		chain_pend_omega = 0.0;
+		// Crane starts directly above chain_start → same formula as normal mode
+		chain_crane_prev_lat = (double)(chain_start_x - chain_track_x) * ((double)chain_lat_unit_x / (double)PRECISION)
+		                     + (double)(chain_start_z - chain_track_z) * ((double)chain_lat_unit_z / (double)PRECISION);
+		}
+	else
+		{
+		car_on_chains_countdown = 70;
+		chain_pend_theta = 0.0;
+		chain_pend_omega = 0.0;
+		// Crane starts directly above chain_start position
+		chain_crane_prev_lat = (double)(chain_start_x - chain_track_x) * ((double)chain_lat_unit_x / (double)PRECISION)
+		                     + (double)(chain_start_z - chain_track_z) * ((double)chain_lat_unit_z / (double)PRECISION);
+		}
+	on_chains = TRUE;
+	chain_crane_prev_lat_vel = 0.0;
+	chain_boost_pressed = false;
+	chain_boost_was_released = false;
+
+	// Zero out all speeds — crane holds the car
+	player_world_x_speed = 0;
+	player_world_y_speed = 0;
+	player_world_z_speed = 0;
+	player_x_speed = 0;
+	player_y_speed = 0;
+	player_z_speed = 0;
+	player_x_rotation_speed = 0;
+	player_y_rotation_speed = 0;
+	player_z_rotation_speed = 0;
 }
 
 
@@ -4440,4 +4837,32 @@ void GetPlayerWheelHeights(long *fl, long *fr, long *r)
 	*fl = front_left_actual_height;
 	*fr = front_right_actual_height;
 	*r = rear_actual_height;
+}
+
+// ── Chain/crane mechanic accessors ──
+
+bool IsCarOnChains(void)
+{
+	return on_chains != FALSE;
+}
+
+long GetCarOnChainsCountdown(void)
+{
+	return car_on_chains_countdown;
+}
+
+long GetChainSwingFromLeft(void)
+{
+	return chain_swing_from_left;
+}
+
+bool IsChainBoostHintVisible(void)
+{
+	// Show "press boost" hint once the lateral sweep has finished and
+	// the car has been dangling for ~1 second (25 frames at 25 fps).
+	// CD_REC_SWEEP=130 (sweep ends), CD_REC_HINT=105 (hint appears = 25 frames later).
+	return on_chains != FALSE
+	    && chain_is_recovery
+	    && car_on_chains_countdown > 0
+	    && car_on_chains_countdown <= 105;
 }
