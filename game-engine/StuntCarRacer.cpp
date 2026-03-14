@@ -1563,17 +1563,8 @@ void CALLBACK KeyboardProc( UINT nChar, bool bKeyDown, bool bAltDown, void *pUse
 			}
             break;
 
-		case 'O':
-			bPaused = FALSE;
-            break;
-
 		case 'P':
-			bPaused = TRUE;
-            break;
-
-		case 'Z':
-			bNewGame = TRUE;		// for testing to try stopping car positioning bug
-            break;
+				bPaused = !bPaused;
 
 		// controls for Car Behaviour, Player 1
         case 'S':
