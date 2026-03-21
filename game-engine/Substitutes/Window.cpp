@@ -16,8 +16,8 @@ SDL_GLContext glContext;
 
 EM_JS(UINT, get_canvas_width, (), { return canvas.width; })
 EM_JS(UINT, get_canvas_height, (), { return canvas.height; })
-EM_JS(UINT, initial_canvas_width, (), { return window.production ? window.innerWidth : 320; })
-EM_JS(UINT, initial_canvas_height, (), { return window.production ? window.innerHeight : 240; })
+EM_JS(UINT, initial_canvas_width, (), { return window.gameCanvasWidth || (window.production ? window.innerWidth : 320); })
+EM_JS(UINT, initial_canvas_height, (), { return window.gameCanvasHeight || (window.production ? window.innerHeight : 240); })
 EM_JS(int, is_production, (), { return window.production ? 1 : 0; })
 
 // Thanks to https://codingtidbit.com/2019/08/24/bring-your-c-opengl-code-to-the-web/ for tips!

@@ -340,6 +340,86 @@
   font-size: 12px;
 }
 
+/* ── Race-mode canvas: 8∶5 aspect ratio ─────────────────── */
+
+#canvas.race-mode {
+  position: fixed !important;
+  width: min(100vw, calc(100vh * 8 / 5)) !important;
+  height: min(100vh, calc(100vw * 5 / 8)) !important;
+  width: min(100dvw, calc(100dvh * 8 / 5)) !important;
+  height: min(100dvh, calc(100dvw * 5 / 8)) !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* ── Cockpit overlay ──────────────────────────────────────── */
+
+#cockpit-overlay {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: min(100vw, calc(100vh * 8 / 5));
+  height: min(100vh, calc(100vw * 5 / 8));
+  width: min(100dvw, calc(100dvh * 8 / 5));
+  height: min(100dvh, calc(100dvw * 5 / 8));
+  transform: translate(-50%, -50%);
+  container-type: size;
+  pointer-events: none;
+  z-index: 50;
+  display: none;
+}
+
+#cockpit-img {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#cockpit-canvas {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* cockpit.png is 320×200, so all offsets are fractions of those dimensions */
+.cockpit-text {
+  position: absolute;
+  font-family: 'Courier New', Courier, monospace;
+  color: #000;
+  font-size: 3.25cqh;
+  font-stretch: expanded;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  width: calc(48 / 320 * 100%);
+  height: 3.25cqh;
+  pointer-events: none;
+  text-align: center;
+}
+
+#cockpit-lap-boost {
+  left: calc(38 / 320 * 100%);
+  top: calc(179 / 200 * 100%);
+}
+
+#cockpit-distance {
+  left: calc(38 / 320 * 100%);
+  top: calc(189 / 200 * 100%);
+}
+
+#cockpit-laptime {
+  left: calc(236 / 320 * 100%);
+  top: calc(179 / 200 * 100%);
+}
+
+#cockpit-bestlap {
+  left: calc(236 / 320 * 100%);
+  top: calc(189 / 200 * 100%);
+}
+
 /* ── Credits ── */
 
 .credits-btn {

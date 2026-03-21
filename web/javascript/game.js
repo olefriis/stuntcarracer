@@ -430,6 +430,24 @@
     // ── HUD: info box (left side) ──
     createHudBox();
 
+    // ── Cockpit overlay (race HUD: PNG frame + speed bar canvas + text fields) ──
+    var cockpitDiv = document.createElement('div');
+    cockpitDiv.id = 'cockpit-overlay';
+    var cockpitImg = document.createElement('img');
+    cockpitImg.id = 'cockpit-img';
+    cockpitImg.src = 'images/cockpit.png';
+    cockpitDiv.appendChild(cockpitImg);
+    var cockpitCvs = document.createElement('canvas');
+    cockpitCvs.id = 'cockpit-canvas';
+    cockpitDiv.appendChild(cockpitCvs);
+    ['cockpit-lap-boost', 'cockpit-distance', 'cockpit-laptime', 'cockpit-bestlap'].forEach(function (tid) {
+      var t = document.createElement('div');
+      t.id = tid;
+      t.className = 'cockpit-text';
+      cockpitDiv.appendChild(t);
+    });
+    document.body.appendChild(cockpitDiv);
+
     // ── Season overlay (styled via #season-overlay / #season-card in game.css) ──
     var overlay = document.createElement('div');
     overlay.id = 'season-overlay';
@@ -441,7 +459,7 @@
     // ── Chain overlay canvas (drawn over the 3D view during crane lifting) ──
     var chainCanvas = document.createElement('canvas');
     chainCanvas.id = 'chain-canvas';
-    chainCanvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:99;display:none;';
+    chainCanvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:40;display:none;';
     document.body.appendChild(chainCanvas);
 
     wireButtons();
@@ -1489,6 +1507,12 @@
       var e = document.getElementById(ALL_ELS[i]);
       if (e) e.style.display = 'none';
     }
+    var co = document.getElementById('cockpit-overlay');
+    if (co) co.style.display = 'none';
+    var cvs = document.getElementById('canvas');
+    if (cvs) cvs.classList.remove('race-mode');
+    delete window.gameCanvasWidth;
+    delete window.gameCanvasHeight;
     hideOverlay();
   }
 
@@ -1511,7 +1535,11 @@
       case UI_PRACTISE_RACE:
       case UI_SEASON_RACE:
       case UI_MP_RACE:
-        showEls(['tc-menu', 'tc-hud-damage', 'tc-hud-box']);
+        showEls(['tc-menu']);
+        var co = document.getElementById('cockpit-overlay');
+        if (co) co.style.display = 'block';
+        var cvs = document.getElementById('canvas');
+        if (cvs) cvs.classList.add('race-mode');
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
         break;
       case UI_PRACTISE_RESULT:
@@ -1628,6 +1656,68 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  //  COCKPIT SPEED BAR
+  // ══════════════════════════════════════════════════════════════
+
+  function updateCockpitSpeedBar() {
+    var cvs = document.getElementById('cockpit-canvas');
+    if (!cvs) return;
+    var overlay = document.getElementById('cockpit-overlay');
+    if (!overlay) return;
+    var w = overlay.offsetWidth;
+    var h = overlay.offsetHeight;
+    if (cvs.width !== w || cvs.height !== h) {
+      cvs.width = w;
+      cvs.height = h;
+    }
+    var ctx = cvs.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+
+    var scaleX = w / 320;
+    var scaleY = h / 200;
+
+    // ── Damage bar: (41,3) to (279,3), 1px high ──
+    var dmgFrac = Math.min(1, getDamage() / 240);
+    if (dmgFrac > 0) {
+      var dmgX = 41 * scaleX;
+      var dmgY = 3 * scaleY;
+      var dmgW = 238 * dmgFrac * scaleX;
+      var dmgH = Math.max(1, 1 * scaleY);
+      ctx.fillStyle = '#ff3333';
+      ctx.fillRect(dmgX, dmgY, dmgW, dmgH);
+    }
+
+    // ── Holes: 10 slots across the damage bar ──
+    var holePos = getDamageHolePosition();
+    var numHoles = 10 - holePos;
+    if (numHoles > 0) {
+      var slotW = 238 / 10 * scaleX;
+      var holeH = Math.max(1, 1 * scaleY);
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      for (var hi = 0; hi < numHoles; hi++) {
+        // Holes appear from right to left
+        var hx = (41 + (9 - hi) * 238 / 10) * scaleX;
+        ctx.fillRect(hx, 3 * scaleY, slotW, holeH);
+      }
+    }
+
+    // ── Speed bar ──
+    var speed = getDisplaySpeed();
+    // Compute right edge of speed bar in native 320×200 coordinate space.
+    // x=105 → speed 50, x=123 → speed 80 → slope = 0.6 px/unit
+    var xRightNative = 105 + (speed - 50) * 0.6;
+    if (xRightNative > 97) {
+      if (xRightNative > 220) xRightNative = 220;
+      var xLeft   = 97 * scaleX;
+      var xRight  = xRightNative * scaleX;
+      var yTop    = 174 * scaleY;
+      var yHeight = Math.max(1, 2 * scaleY);
+      ctx.fillStyle = '#ffff00';
+      ctx.fillRect(xLeft, yTop, xRight - xLeft, yHeight);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
   //  PER-FRAME UPDATE
   // ══════════════════════════════════════════════════════════════
 
@@ -1705,8 +1795,8 @@
     updateChainCanvas();
 
     // HUD updates
-    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE || uiMode === UI_PRACTISE_RESULT) {
-      // Damage bar (top)
+    if (uiMode === UI_PRACTISE_RESULT) {
+      // Damage bar (DOM-based, only for result screen)
       var df = document.getElementById('tc-hud-damage-fill');
       if (df) df.style.width = Math.min(100, Math.round(100 * getDamage() / 240)) + '%';
       var dh = document.getElementById('tc-hud-damage-holes');
@@ -1718,24 +1808,33 @@
           slots[hi].style.display = (hi < numHoles) ? 'flex' : 'none';
         }
       }
+    }
 
-      // Vertical speed bar
-      var sf = document.getElementById('hud-speed-fill');
-      if (sf) sf.style.height = Math.min(100, Math.round(100 * getDisplaySpeed() / 240)) + '%';
-
-      // Lap row
+    // Cockpit overlay HUD (shown during active races only)
+    if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) {
+      // Keep canvas at 8:5 aspect ratio
+      var vw = window.innerWidth, vh = window.innerHeight;
+      if (vw / vh > 8 / 5) {
+        window.gameCanvasWidth = Math.round(vh * 8 / 5);
+        window.gameCanvasHeight = vh;
+      } else {
+        window.gameCanvasWidth = vw;
+        window.gameCanvasHeight = Math.round(vw * 5 / 8);
+      }
       var lap = getLapNumber();
-      var lapEl = document.getElementById('hud-lap');
-      if (lapEl) lapEl.textContent = lap >= 1 ? ('Lap ' + Math.min(lap, 3) + '/3') : 'Lap -/3';
 
-      // Boost row
-      var bEl = document.getElementById('hud-boost');
-      if (bEl) bEl.textContent = 'Boost ' + getBoostReserve();
+      // Lap / boost
+      var lapBoostEl = document.getElementById('cockpit-lap-boost');
+      if (lapBoostEl) {
+        var lapStr = lap >= 1 ? 'L' + Math.min(lap, 3) : 'L\u00A0';
+        var boostStr = 'B' + String(getBoostReserve()).padStart(2, '\u00A0');
+        lapBoostEl.textContent = lapStr + '\u00A0' + boostStr;
+      }
 
       // Distance to opponent
-      var distEl = document.getElementById('hud-distance');
+      var distEl = document.getElementById('cockpit-distance');
       if (distEl) {
-        if (uiMode === UI_PRACTISE_RACE || uiMode === UI_PRACTISE_RESULT) {
+        if (uiMode === UI_PRACTISE_RACE) {
           distEl.textContent = '\u00A0';
         } else {
           var rawDist = getDistanceToOpponent();
@@ -1747,18 +1846,21 @@
       }
 
       // Current lap time
-      var ltEl = document.getElementById('hud-laptime');
+      var ltEl = document.getElementById('cockpit-laptime');
       if (ltEl) {
         var curMs = getCurrentLapTime();
         ltEl.textContent = (lap >= 1 && curMs > 0) ? fmtLap(curMs) : '\u00A0';
       }
 
       // Best lap time
-      var blEl = document.getElementById('hud-bestlap');
+      var blEl = document.getElementById('cockpit-bestlap');
       if (blEl) {
         var bestMs = getPlayerBestLap();
-        blEl.textContent = bestMs > 0 ? (fmtLap(bestMs) + ' \u2605') : '\u00A0';
+        blEl.textContent = bestMs > 0 ? fmtLap(bestMs) : '\u00A0';
       }
+
+      // Speed bar on cockpit canvas
+      updateCockpitSpeedBar();
     }
 
     // ── Multiplayer per-frame state exchange ──

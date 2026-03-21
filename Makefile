@@ -59,7 +59,11 @@ JS_DIST    = $(patsubst $(WEB)/javascript/%,$(DIST)/%,$(JS_SOURCES))
 
 .PHONY: all debug clean
 
-all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS)) $(JS_DIST)
+# Image assets under web/images/ to copy into dist/images/
+IMAGES     = $(wildcard $(WEB)/images/*)
+IMAGES_DIST = $(patsubst $(WEB)/%,$(DIST)/%,$(IMAGES))
+
+all: $(DIST)/source.html $(addprefix $(DIST)/,$(PWA_ASSETS)) $(JS_DIST) $(IMAGES_DIST)
 
 debug: $(DIST)/source.html
 
@@ -82,11 +86,17 @@ $(DIST)/%.js: $(WEB)/javascript/%.js | $(DIST)
 $(DIST)/%.css: $(WEB)/%.css | $(DIST)
 	cp $< $@
 
+$(DIST)/images/%: $(WEB)/images/% | $(DIST)/images
+	cp $< $@
+
 $(DIST)/%.png: $(WEB)/%.png | $(DIST)
 	cp $< $@
 
 $(DIST):
 	mkdir -p $(DIST)
+
+$(DIST)/images:
+	mkdir -p $(DIST)/images
 
 clean:
 	rm -rf $(DIST)
