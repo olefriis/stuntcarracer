@@ -12,7 +12,10 @@ var ASSETS = [
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
-  'images/cockpit.png'
+  'images/cockpit.png',
+  'images/boost-1.png',
+  'images/boost-2.png',
+  'images/boost-3.png'
 ];
 
 // Install: pre-cache core assets

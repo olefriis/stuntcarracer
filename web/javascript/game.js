@@ -112,6 +112,10 @@
   var humanDivision = 0;
   var superLeague = false;
   var damageHolePosition = 10;  // 10 = fully intact, 0 = all holes
+
+  // ── Boost flame overlay state ──────────────────────────────
+  var boostFrameIndex = 0;
+  var boostFrameTime = 0;
   var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
   var seasonStartDamageHolePosition = null; // hole position snapshot at season start
@@ -271,6 +275,7 @@
   function getBoostReserve()   { return Module._jsGetBoostReserve(); }
   function getBoostMax()       { return Module._jsGetBoostMax(); }
   function getDamage()         { return Module._jsGetDamage(); }
+  function isBoostActive()     { return !!Module._jsIsBoostActive(); }
   function getDamageHolePosition() { return Module._jsGetDamageHolePosition(); }
   function getLapNumber()      { return Module._jsGetLapNumber(); }
   function getPlayerBestLap()  { return Module._jsGetPlayerBestLap(); }
@@ -437,6 +442,14 @@
     cockpitImg.id = 'cockpit-img';
     cockpitImg.src = 'images/cockpit.png';
     cockpitDiv.appendChild(cockpitImg);
+    // Boost flame overlay images (cycle while boosting)
+    for (var bi = 1; bi <= 3; bi++) {
+      var bImg = document.createElement('img');
+      bImg.className = 'cockpit-boost-img';
+      bImg.src = 'images/boost-' + bi + '.png';
+      bImg.style.display = 'none';
+      cockpitDiv.appendChild(bImg);
+    }
     var cockpitCvs = document.createElement('canvas');
     cockpitCvs.id = 'cockpit-canvas';
     cockpitDiv.appendChild(cockpitCvs);
@@ -1861,6 +1874,23 @@
 
       // Speed bar on cockpit canvas
       updateCockpitSpeedBar();
+
+      // Boost flame overlay
+      var boostImgs = document.querySelectorAll('.cockpit-boost-img');
+      if (isBoostActive()) {
+        var now = performance.now();
+        if (now - boostFrameTime >= 100) {
+          boostFrameTime = now;
+          boostFrameIndex = (boostFrameIndex + 1) % 3;
+        }
+        for (var bi = 0; bi < boostImgs.length; bi++) {
+          boostImgs[bi].style.display = (bi === boostFrameIndex) ? 'block' : 'none';
+        }
+      } else {
+        for (var bi = 0; bi < boostImgs.length; bi++) {
+          boostImgs[bi].style.display = 'none';
+        }
+      }
     }
 
     // ── Multiplayer per-frame state exchange ──

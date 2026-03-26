@@ -384,6 +384,15 @@
   pointer-events: none;
 }
 
+.cockpit-boost-img {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+
 /* cockpit.png is 320×200, so all offsets are fractions of those dimensions */
 .cockpit-text {
   position: absolute;

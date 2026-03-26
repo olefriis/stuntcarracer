@@ -158,7 +158,7 @@ static long road_cushion_value = 0;
 
 static long left_right_value;
 static long engine_z_acceleration;
-static long boost_activated;
+long boost_activated;
 
 static long rear_wheel_x_offset, rear_wheel_z_offset;
 static long front_left_wheel_x_offset, front_left_wheel_z_offset;

@@ -74,6 +74,7 @@ long VALUE1 = 1, VALUE2 = 2, VALUE3 = 3;
 
 extern long TrackID;
 extern long boostReserve, boostUnit, StandardBoost, SuperBoost;
+extern long boost_activated;
 extern long INITIALISE_PLAYER;
 extern bool raceFinished, raceWon;
 extern long lapNumber[];
@@ -1834,6 +1835,10 @@ int jsGetBoostMax() { return (int)((super_league_mode ? SuperBoost : StandardBoo
 // Get current damage (0–255)
 EMSCRIPTEN_KEEPALIVE
 int jsGetDamage() { return (int)new_damage; }
+
+// Is boost currently active?
+EMSCRIPTEN_KEEPALIVE
+int jsIsBoostActive() { return boost_activated ? 1 : 0; }
 
 // Get damage hole position (10 = fully intact, 0 = all holes)
 EMSCRIPTEN_KEEPALIVE
