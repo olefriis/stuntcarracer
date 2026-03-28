@@ -1789,6 +1789,7 @@ void jsStartGame(int opponentId) {
     boostUnit = 0;
     bPlayerPaused = bOpponentPaused = FALSE;
     playerWrecked = false;
+    lastInput = 0;
 }
 
 // Return to the track menu

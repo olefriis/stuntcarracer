@@ -362,6 +362,8 @@ static void ReadRecordedFile (void);
 static bool OpenAmigaRecording( void );
 #endif
 
+static void ResetEngineRevs(void);
+
 /*	======================================================================================= */
 /*	Function:		ResetPlayer																*/
 /*																							*/
@@ -371,6 +373,7 @@ static bool OpenAmigaRecording( void );
 void ResetPlayer (void)
 	{
 	// resets almost everything at the moment, just to make sure
+	ResetEngineRevs();
 	player_x = 0;
 	player_y = 0;
 	player_z = 0;
@@ -4049,6 +4052,13 @@ long CalculateDisplaySpeed (void)
 static long engineRevs = 0;
 static long engineRevsChange = 0;
 static long engineFluctuation = 0;
+
+static void ResetEngineRevs (void)
+{
+	engineRevs = 0;
+	engineRevsChange = 0;
+	engineFluctuation = 0;
+}
 
 // Tested against Amiga
 static void UpdateEngineRevs (void)

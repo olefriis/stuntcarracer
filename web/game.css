@@ -420,6 +420,7 @@
   height: 3.25cqh;
   pointer-events: none;
   text-align: center;
+  z-index: 2;
 }
 
 #cockpit-lap-boost {

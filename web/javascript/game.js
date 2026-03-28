@@ -319,9 +319,27 @@
 
   function selectTrack(index)  { Module._jsSetSuperLeague(superLeague ? 1 : 0); Module._jsSelectTrack(index); }
   function startPreview()      { Module._jsStartPreview(); }
-  function startGame(opp)      { Module._jsSetDamageHolePosition(10); Module._jsStartGame(opp); }
+  function startGame(opp)      {
+    // Reset drive inputs so we don't carry stale state from a previous race
+    touchDrive.left = touchDrive.right = touchDrive.gas = touchDrive.brake = touchDrive.boost = false;
+    setDriveInput(0);
+    Module._jsSetDamageHolePosition(10);
+    Module._jsStartGame(opp);
+  }
   function goToMenu()          { Module._jsGoToMenu(); }
   function setGameOver()       { Module._jsSetGameOver(); }
+
+  // Central exit point for leaving any race. Captures C++ state before
+  // this is called, then: stop the race, fade to black, reset C++ to
+  // menu state, tear down the HUD, and finally run the callback.
+  function leaveRace(callback) {
+    setGameOver();
+    fadeAndDo(function () {
+      goToMenu();
+      hideAllUI();
+      callback();
+    });
+  }
 
   // Cheat mode (only available in CHEAT=1 builds)
   var cheatAvailable = false;
@@ -793,7 +811,6 @@
     var oBest = getOpponentBestLap();
     var opponent = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
 
-    // Read back holes — smashes during the race decrement this
     damageHolePosition = getDamageHolePosition();
 
     if (wrecked) {
@@ -815,10 +832,7 @@
     season.points[race.bestLapDriver].bestLaps++;
     saveProgress();
 
-    fadeAndDo(function () {
-      goToMenu();
-      showRaceResult(race);
-    });
+    leaveRace(function () { showRaceResult(race); });
   }
 
   function pauseSeason() {
@@ -1116,15 +1130,11 @@
   }
 
   function finishMpRace() {
-    // 'finished' message was already sent during race-end detection
+    // Capture C++ state before leaveRace resets it
     var wrecked = isPlayerWrecked();
-    // Determine result: won if we finished first and weren't wrecked,
-    // OR if opponent was wrecked and we weren't
-    var won = false;
-    if (!wrecked) {
-      won = mpPlayerFinishedFirst || mpOpponentWrecked;
-    }
-    uiMode = UI_MP_RESULT;
+    var won = !wrecked && (mpPlayerFinishedFirst || mpOpponentWrecked);
+    var pBest = getPlayerBestLap();
+
     var h = '<div class="overlay-title">Race Complete</div>';
     if (wrecked && mpOpponentWrecked) {
       h += '<div class="overlay-result-large color-orange">BOTH WRECKED</div>';
@@ -1135,36 +1145,37 @@
     } else {
       h += '<div class="overlay-result-large color-orange">YOU LOSE</div>';
     }
-    var pBest = getPlayerBestLap();
     if (pBest > 0) {
       h += '<div class="overlay-info">Your best lap: ' + fmtLap(pBest) + '</div>';
     }
     h += '<div id="mp-btn-again" class="overlay-button">Play Again</div>';
     h += '<div id="mp-btn-quit" class="overlay-button overlay-button-secondary">Quit</div>';
-    showOverlay(h);
-    overlayBtn('mp-btn-again', 'AGAIN', function () {
-      hideOverlay();
-      mpOpponentFinished = false;
-      mpOpponentWrecked = false;
-      mpPlayerFinishedFirst = false;
-      mpPlayerNotified = false;
-      goToMenu();  // reset C++ state fully between races
-      if (SCR_Multiplayer.isHost()) {
-        showMpHostTrack();
-      } else {
-        // Show waiting screen
-        uiMode = UI_MP_JOIN_LOBBY;
-        var h2 = '<div class="overlay-title">Waiting</div>';
-        h2 += '<div class="overlay-description">Waiting for host to select next track\u2026</div>';
-        showOverlay(h2);
-      }
-    });
-    overlayBtn('mp-btn-quit', 'QUIT', function () {
-      mpCleanup();
-      hideOverlay();
-      goToMenu();
-      uiMode = UI_MAIN_MENU;
-      showUIForMode();
+
+    leaveRace(function () {
+      uiMode = UI_MP_RESULT;
+      showOverlay(h);
+      overlayBtn('mp-btn-again', 'AGAIN', function () {
+        hideOverlay();
+        mpOpponentFinished = false;
+        mpOpponentWrecked = false;
+        mpPlayerFinishedFirst = false;
+        mpPlayerNotified = false;
+        goToMenu();
+        if (SCR_Multiplayer.isHost()) {
+          showMpHostTrack();
+        } else {
+          uiMode = UI_MP_JOIN_LOBBY;
+          var h2 = '<div class="overlay-title">Waiting</div>';
+          h2 += '<div class="overlay-description">Waiting for host to select next track\u2026</div>';
+          showOverlay(h2);
+        }
+      });
+      overlayBtn('mp-btn-quit', 'QUIT', function () {
+        mpCleanup();
+        goToMenu();
+        uiMode = UI_MAIN_MENU;
+        showUIForMode();
+      });
     });
   }
 
@@ -1291,36 +1302,27 @@
   // ══════════════════════════════════════════════════════════════
 
   function handleMenuDuringRace() {
-    fadeAndDo(function () {
-      if (uiMode === UI_MP_RACE) {
-        setGameOver();
-        // Notify opponent we're quitting
-        if (SCR_Multiplayer.isConnected()) {
-          try { SCR_Multiplayer.sendReliable({ type: 'quit' }); } catch(e) {}
-        }
-        mpCleanup();
-        goToMenu();
-        uiMode = UI_MAIN_MENU;
-        showUIForMode();
-      } else if (uiMode === UI_SEASON_RACE) {
-        // Read back holes before recording the loss
-        damageHolePosition = getDamageHolePosition();
-        var race = season.schedule[season.currentRace];
-        var opp = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
-        race.winnerDriver = opp;
-        race.bestLapDriver = opp;
-        race.played = true;
-        season.points[opp].wins++;
-        season.points[opp].bestLaps++;
-        saveProgress();
-        goToMenu();
-        showRaceResult(race);
-      } else {
-        goToMenu();
-        uiMode = UI_MAIN_MENU;
-        showUIForMode();
+    if (uiMode === UI_MP_RACE) {
+      if (SCR_Multiplayer.isConnected()) {
+        try { SCR_Multiplayer.sendReliable({ type: 'quit' }); } catch(e) {}
       }
-    });
+      mpCleanup();
+      leaveRace(function () { uiMode = UI_MAIN_MENU; showUIForMode(); });
+    } else if (uiMode === UI_SEASON_RACE) {
+      // Record as a loss before leaveRace resets C++ state
+      damageHolePosition = getDamageHolePosition();
+      var race = season.schedule[season.currentRace];
+      var opp = (race.driverA === HUMAN_PLAYER) ? race.driverB : race.driverA;
+      race.winnerDriver = opp;
+      race.bestLapDriver = opp;
+      race.played = true;
+      season.points[opp].wins++;
+      season.points[opp].bestLaps++;
+      saveProgress();
+      leaveRace(function () { showRaceResult(race); });
+    } else {
+      leaveRace(function () { uiMode = UI_MAIN_MENU; showUIForMode(); });
+    }
   }
 
   function addBtn(id, cb) {
@@ -1403,10 +1405,7 @@
     // Close / menu
     addBtn('tc-menu', handleMenuDuringRace);
 
-    // Game Over (practise)
-    addBtn('tc-gameover', function () {
-      fadeAndDo(function () { goToMenu(); uiMode = UI_PRACTISE_MENU; showUIForMode(); });
-    });
+
   }
 
   function wireKeyboard() {
@@ -1576,8 +1575,6 @@
         if (cvs) cvs.classList.add('race-mode');
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
         break;
-      case UI_PRACTISE_RESULT:
-        showEls(['tc-gameover-label', 'tc-gameover']); break;
       // Season overlays managed by showOverlay()
     }
   }
@@ -1901,39 +1898,17 @@
       if (canExit && Date.now() - raceEndTime > 6000) {
         raceEndTime = 0;
         if (uiMode === UI_MP_RACE) {
-          setGameOver();
           finishMpRace();
         } else if (uiMode === UI_SEASON_RACE) {
-          setGameOver();
           finishSeasonRace();
         } else {
-          setGameOver();
-          uiMode = UI_PRACTISE_RESULT;
-          var rl = document.getElementById('tc-gameover-label');
-          if (rl) { rl.textContent = isPlayerWrecked() ? 'WRECKED' : 'RACE COMPLETE'; rl.style.opacity = '1'; }
-          showUIForMode();
+          leaveRace(function () { uiMode = UI_PRACTISE_MENU; showUIForMode(); });
         }
       }
     }
 
     // ── Chain / crane overlay ──
     updateChainCanvas();
-
-    // HUD updates
-    if (uiMode === UI_PRACTISE_RESULT) {
-      // Damage bar (DOM-based, only for result screen)
-      var df = document.getElementById('tc-hud-damage-fill');
-      if (df) df.style.width = Math.min(100, Math.round(100 * getDamage() / 240)) + '%';
-      var dh = document.getElementById('tc-hud-damage-holes');
-      if (dh) {
-        var holePos = getDamageHolePosition();
-        var numHoles = 10 - holePos; // how many holes are punched
-        var slots = dh.children;
-        for (var hi = 0; hi < slots.length; hi++) {
-          slots[hi].style.display = (hi < numHoles) ? 'flex' : 'none';
-        }
-      }
-    }
 
     // Cockpit overlay HUD (shown during active races only)
     if (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE) {
