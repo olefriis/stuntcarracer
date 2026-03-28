@@ -96,7 +96,8 @@
   var uiMode = UI_MAIN_MENU;
 
   // Touch drive state (mobile only)
-  var touchDrive = { left: false, right: false, gas: false, brake: false, boost: false };
+  var touchDrive = { left: false, right: false, gas: false, brake: false, gasBoost: false, brakeBoost: false };
+  var activeDriveTouches = {}; // track per-touch state for split buttons
 
   // ── Multiplayer state ──────────────────────────────────────
   var signalingUrl = 'https://stuntcarracer.fly.dev';
@@ -321,7 +322,8 @@
   function startPreview()      { Module._jsStartPreview(); }
   function startGame(opp)      {
     // Reset drive inputs so we don't carry stale state from a previous race
-    touchDrive.left = touchDrive.right = touchDrive.gas = touchDrive.brake = touchDrive.boost = false;
+    touchDrive.left = touchDrive.right = touchDrive.gas = touchDrive.brake = touchDrive.gasBoost = touchDrive.brakeBoost = false;
+    activeDriveTouches = {};
     setDriveInput(0);
     Module._jsSetDamageHolePosition(10);
     Module._jsStartGame(opp);
@@ -424,9 +426,10 @@
     // ── In-Game driving controls (mobile only) ──
     element('tc-left', '\u25C0\uFE0E');
     element('tc-right', '\u25B6\uFE0E');
-    element('tc-accel', '\u25B2\uFE0E');
-    element('tc-brake', '\u25BC\uFE0E');
-    element('tc-boost', '\u00A0\uD83D\uDD25\u00A0');
+    var accelBtn = element('tc-accel');
+    accelBtn.innerHTML = '<span class="split-left">\uD83D\uDD25</span><span class="split-right">\u25B2\uFE0E</span>';
+    var brakeBtn = element('tc-brake');
+    brakeBtn.innerHTML = '<span class="split-left">\uD83D\uDD25</span><span class="split-right">\u25BC\uFE0E</span>';
 
     // ── In-Game common ──
     element('tc-menu', '\u2715');
@@ -1353,13 +1356,50 @@
     }, { passive: false });
   }
 
+  function addSplitDriveBtn(id, fieldLeft, fieldRight) {
+    var btn = document.getElementById(id);
+    function getField(touch) {
+      var rect = btn.getBoundingClientRect();
+      var x = touch.clientX - rect.left;
+      return (x < rect.width / 2) ? fieldLeft : fieldRight;
+    }
+    btn.addEventListener('touchstart', function (e) {
+      e.preventDefault(); btn.style.background = 'rgba(255,255,255,0.45)';
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var f = getField(t);
+        activeDriveTouches[t.identifier] = f;
+        touchDrive[f] = true;
+      }
+      updateDriveFlags();
+    }, { passive: false });
+    btn.addEventListener('touchend', function (e) {
+      e.preventDefault();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var f = activeDriveTouches[e.changedTouches[i].identifier];
+        if (f) { touchDrive[f] = false; delete activeDriveTouches[e.changedTouches[i].identifier]; }
+      }
+      if (!touchDrive[fieldLeft] && !touchDrive[fieldRight]) btn.style.background = 'rgba(255,255,255,0.18)';
+      updateDriveFlags();
+    }, { passive: false });
+    btn.addEventListener('touchcancel', function (e) {
+      e.preventDefault();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var f = activeDriveTouches[e.changedTouches[i].identifier];
+        if (f) { touchDrive[f] = false; delete activeDriveTouches[e.changedTouches[i].identifier]; }
+      }
+      if (!touchDrive[fieldLeft] && !touchDrive[fieldRight]) btn.style.background = 'rgba(255,255,255,0.18)';
+      updateDriveFlags();
+    }, { passive: false });
+  }
+
   function updateDriveFlags() {
     var d = touchDrive, f = 0;
     if (d.left)  f |= KEY_LEFT;
     if (d.right) f |= KEY_RIGHT;
-    if (d.gas && d.boost)   f |= KEY_ACCEL_BOOST;
+    if (d.gasBoost)         f |= KEY_ACCEL_BOOST;
     else if (d.gas)         f |= KEY_ACCEL_ONLY;
-    if (d.brake && d.boost) f |= KEY_BRAKE_BOOST;
+    if (d.brakeBoost)       f |= KEY_BRAKE_BOOST;
     else if (d.brake)       f |= KEY_HASH;
     setDriveInput(f);
   }
@@ -1398,9 +1438,8 @@
     // In-Game drive
     addDriveBtn('tc-left', 'left');
     addDriveBtn('tc-right', 'right');
-    addDriveBtn('tc-accel', 'gas');
-    addDriveBtn('tc-brake', 'brake');
-    addDriveBtn('tc-boost', 'boost');
+    addSplitDriveBtn('tc-accel', 'gasBoost', 'gas');
+    addSplitDriveBtn('tc-brake', 'brakeBoost', 'brake');
 
     // Close / menu
     addBtn('tc-menu', handleMenuDuringRace);
@@ -1573,7 +1612,7 @@
         if (co) co.style.display = 'block';
         var cvs = document.getElementById('canvas');
         if (cvs) cvs.classList.add('race-mode');
-        if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost']);
+        if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake']);
         break;
       // Season overlays managed by showOverlay()
     }

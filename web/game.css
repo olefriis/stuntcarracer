@@ -181,26 +181,35 @@
   font-size: min(5vw, 28px);
 }
 
+#tc-accel, #tc-brake {
+  display: none;
+  flex-direction: row;
+}
+
+#tc-accel .split-left, #tc-accel .split-right,
+#tc-brake .split-left, #tc-brake .split-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#tc-accel .split-left, #tc-brake .split-left {
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 #tc-accel {
   right: 2vw; bottom: 30vh;
-  width: 11vw; height: 11vw;
-  max-width: 65px; max-height: 65px;
-  font-size: min(5vw, 28px);
+  width: 18vw; height: 11vw;
+  max-width: 100px; max-height: 65px;
+  font-size: min(4vw, 22px);
 }
 
 #tc-brake {
   right: 2vw; bottom: 6vh;
-  width: 11vw; height: 11vw;
-  max-width: 65px; max-height: 65px;
-  font-size: min(5vw, 28px);
-}
-
-#tc-boost {
-  left: 50%; bottom: 6vh;
-  width: 22vw; height: 11vw;
-  max-width: 120px; max-height: 65px;
-  font-size: min(5vw, 28px);
-  transform: translateX(-50%);
+  width: 18vw; height: 11vw;
+  max-width: 100px; max-height: 65px;
+  font-size: min(4vw, 22px);
 }
 
 /* ── In-game common ──────────────────────────────────────── */
