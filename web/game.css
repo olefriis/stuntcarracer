@@ -362,6 +362,22 @@
   transform: translate(-50%, -50%) !important;
 }
 
+/* ── Chain overlay ─────────────────────────────────────────── */
+
+#chain-img {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: min(100vw, calc(100vh * 8 / 5));
+  height: min(100vh, calc(100vw * 5 / 8));
+  width: min(100dvw, calc(100dvh * 8 / 5));
+  height: min(100dvh, calc(100dvw * 5 / 8));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 40;
+  display: none;
+  image-rendering: pixelated;
+}
+
 /* ── Cockpit overlay ──────────────────────────────────────── */
 
 #cockpit-overlay {

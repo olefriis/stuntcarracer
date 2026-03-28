@@ -511,11 +511,11 @@
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
-    // ── Chain overlay canvas (drawn over the 3D view during crane lifting) ──
-    var chainCanvas = document.createElement('canvas');
-    chainCanvas.id = 'chain-canvas';
-    chainCanvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:40;display:none;';
-    document.body.appendChild(chainCanvas);
+    // ── Chain overlay image (shown during crane lifting) ──
+    var chainImg = document.createElement('img');
+    chainImg.id = 'chain-img';
+    chainImg.src = 'images/chains.png';
+    document.body.appendChild(chainImg);
 
     wireButtons();
     wireKeyboard();
@@ -1622,107 +1622,36 @@
   //  CHAIN / CRANE OVERLAY
   // ══════════════════════════════════════════════════════════════
 
-  // Scroll offset for the chain links when the car has been released.
+  // Scroll offset for the chain image when the car has been released.
   var chainScrollOffset = 0;
   var chainReleasing = false;
 
   function updateChainCanvas() {
-    var canvas = document.getElementById('chain-canvas');
-    if (!canvas) return;
+    var img = document.getElementById('chain-img');
+    if (!img) return;
 
     var inRace = (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE);
     var onChains = inRace && isCarOnChains();
 
     // Once car leaves chains, animate chains scrolling off upward
     if (!onChains && chainReleasing) {
-      chainScrollOffset -= 24;
-      if (chainScrollOffset <= -canvas.height) {
+      chainScrollOffset -= 4;
+      if (chainScrollOffset <= -100) {
         chainReleasing = false;
         chainScrollOffset = 0;
-        canvas.style.display = 'none';
+        img.style.display = 'none';
         return;
       }
     } else if (onChains) {
       chainReleasing = true;
       chainScrollOffset = 0;
     } else {
-      canvas.style.display = 'none';
+      img.style.display = 'none';
       return;
     }
 
-    // Size canvas to window
-    var w = window.innerWidth;
-    var h = window.innerHeight;
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-    canvas.style.display = 'block';
-
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-
-    // Chains always hang from top of screen to bottom, regardless of phase.
-    // When the car is released the chains scroll upward and disappear.
-    var scrollY = chainScrollOffset;
-    var chainBottom = h * 1.05;  // slightly past bottom edge so last link isn't clipped
-
-    // Chain X positions: ~25% from left edge and ~25% from right edge
-    var leftChainX  = w * 0.25;
-    var rightChainX = w * 0.75;
-
-    drawChain(ctx, leftChainX,  scrollY, chainBottom + scrollY, w);
-    drawChain(ctx, rightChainX, scrollY, chainBottom + scrollY, w);
-
-    // "Press boost to drop" hint during recovery hover phase
-    if (isCarOnChains() && isChainBoostHintVisible()) {
-      var hintText = isMobile ? 'Tap \uD83D\uDD25 to drop' : 'Press boost to drop';
-      var fontSize = Math.round(Math.min(w, h) * 0.045);
-      ctx.font = 'bold ' + fontSize + 'px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      // Subtle pulsing alpha so the text catches attention
-      var pulse = 0.65 + 0.35 * Math.sin(Date.now() / 300);
-      ctx.fillStyle = 'rgba(255, 220, 80, ' + pulse + ')';
-      ctx.fillText(hintText, w / 2, h * 0.80);
-    }
-  }
-
-  function drawChain(ctx, cx, topY, bottomY, screenW) {
-    // Draw a chain as alternating O (ellipse) and | (narrow ellipse) links.
-    // Each link is drawn as an ellipse.
-    var linkH = 24;    // height of each link (px)
-    var linkW = 36;    // wide radius for O links
-    var linkThin = 6;  // narrow radius for | links
-    var lineW = 4;     // stroke width
-
-    ctx.lineWidth = lineW;
-
-    var y = topY;
-    var isO = true;  // alternate between O and | links
-
-    while (y < bottomY) {
-      var cy = y + linkH / 2;
-      var rx, ry;
-      if (isO) {
-        rx = linkW / 2;
-        ry = linkH / 2;
-      } else {
-        rx = linkThin / 2;
-        ry = linkH / 2;
-      }
-
-      // Only draw links that are partially visible
-      if (cy + ry >= 0 && cy - ry <= screenW * 2) {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = '#c0a860';
-        ctx.stroke();
-      }
-
-      y += linkH;
-      isO = !isO;
-    }
+    img.style.display = 'block';
+    img.style.top = 'calc(50% + ' + chainScrollOffset + 'vh)';
   }
 
   // ══════════════════════════════════════════════════════════════
