@@ -116,6 +116,12 @@
   // ── Boost flame overlay state ──────────────────────────────
   var boostFrameIndex = 0;
   var boostFrameTime = 0;
+
+  // ── Wheel overlay state ────────────────────────────────────
+  var wheelFrameNumber = 0;       // current rotation frame 0-2
+  var wheelRotationAccum = 0;     // 16-bit accumulator; overflows trigger frame advance
+  var wheelRotationSpeed = 0;     // 16-bit speed added each game frame
+
   var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
   var seasonStartDamageHolePosition = null; // hole position snapshot at season start
@@ -299,6 +305,9 @@
   function getChainCountdown()          { return Module._jsGetChainCountdown(); }
   function getChainFromLeft()           { return !!Module._jsGetChainSwingFromLeft(); }
   function isChainBoostHintVisible()    { return !!Module._jsIsChainBoostHintVisible(); }
+  function isTouchingRoad()             { return !!Module._jsIsTouchingRoad(); }
+  function getWheelDiffFL()             { return Module._jsGetWheelDiffFL(); }
+  function getWheelDiffFR()             { return Module._jsGetWheelDiffFR(); }
   function setOpponentState(rs, dist, xPos, zSpd, wFL, wFR, wR) {
     Module._jsSetOpponentState(rs, dist, xPos, zSpd, wFL, wFR, wR);
   }
@@ -442,6 +451,18 @@
     cockpitImg.id = 'cockpit-img';
     cockpitImg.src = 'images/cockpit.png';
     cockpitDiv.appendChild(cockpitImg);
+    // Wheel images (behind the cockpit frame)
+    var wheelSides = ['left', 'right'];
+    for (var wi = 0; wi < wheelSides.length; wi++) {
+      for (var wf = 0; wf < 3; wf++) {
+        var wImg = document.createElement('img');
+        wImg.className = 'cockpit-wheel';
+        wImg.dataset.side = wheelSides[wi];
+        wImg.dataset.frame = wf;
+        wImg.src = 'images/' + wheelSides[wi] + '-wheel-' + wf + '.png';
+        cockpitDiv.appendChild(wImg);
+      }
+    }
     // Boost flame overlay images (cycle while boosting)
     for (var bi = 1; bi <= 3; bi++) {
       var bImg = document.createElement('img');
@@ -1731,6 +1752,97 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  //  WHEEL OVERLAYS
+  // ══════════════════════════════════════════════════════════════
+
+  // Convert a wheel height-difference value (from C++) to a screen Y
+  // offset in the 320×200 coordinate space, replicating the Amiga's
+  // update.wheel.positions formula using a sine approximation.
+  function wheelDiffToY(diff) {
+    // diff from C++: road_height − wheel_height
+    //   positive → suspension compressed (bump, road pushes wheel up)
+    //   negative → airborne (wheel should stay at rest, not anticipate)
+    //
+    // Ignore negative diffs: when airborne the wheels sit at their base
+    // position. Only positive diffs (actual track contact) move them up.
+    if (diff < 0) diff = 0;
+    if (diff > 0x1400) diff = 0x1400;
+
+    // Base Y = 149 (30px lower than original 119). Max bump moves up 40px.
+    var offset = (diff / 0x1400) * 40;
+    return Math.round(126 - offset);
+  }
+
+  function updateWheels() {
+    var wheels = document.querySelectorAll('.cockpit-wheel');
+    if (!wheels.length) return;
+
+    var zSpeed = getPlayerZSpeed();
+    var absSpeed = Math.abs(zSpeed);
+
+    // ── Update wheel rotation speed (matches set.wheel.rotation.speed) ──
+    if (isTouchingRoad()) {
+      if (absSpeed < 0x800) {
+        wheelRotationSpeed = absSpeed * 8;
+      } else {
+        wheelRotationSpeed = absSpeed * 2 + 0x3000;
+        if (wheelRotationSpeed > 0xFF00) wheelRotationSpeed = 0xFF00;
+      }
+    } else {
+      // Amiga decays by 25% per game frame (~25fps); at browser ~60fps use
+      // ~12% (>> 3) so the visual fade-out speed roughly matches.
+      wheelRotationSpeed -= (wheelRotationSpeed >> 3);
+      if (wheelRotationSpeed < 1) wheelRotationSpeed = 0;
+    }
+
+    // ── Advance rotation frame (matches update.wheel.rotation) ──
+    wheelRotationAccum += wheelRotationSpeed;
+    if (wheelRotationAccum >= 0x10000) {
+      wheelRotationAccum -= 0x10000;
+      if (zSpeed >= 0) {
+        wheelFrameNumber = (wheelFrameNumber + 1) % 3;
+      } else {
+        wheelFrameNumber = (wheelFrameNumber + 2) % 3;  // decrement with wrap
+      }
+    }
+
+    // ── Compute Y positions from suspension differences ──
+    var diffFL = getWheelDiffFL();
+    var diffFR = getWheelDiffFR();
+    var leftY = wheelDiffToY(diffFL);
+    var rightY = wheelDiffToY(diffFR);
+
+    // Left wheel: right frame = 5 - frameNumber (Amiga convention)
+    var leftFrame = (5 - wheelFrameNumber) % 3;
+    var rightFrame = wheelFrameNumber;
+
+    // ── Position and show/hide wheel images ──
+    for (var i = 0; i < wheels.length; i++) {
+      var w = wheels[i];
+      var side = w.dataset.side;
+      var frame = parseInt(w.dataset.frame, 10);
+
+      if (side === 'left') {
+        if (frame === leftFrame) {
+          w.style.display = 'block';
+          w.style.left = 'calc(32 / 320 * 100%)';
+          w.style.top = 'calc(' + leftY + ' / 200 * 100%)';
+        } else {
+          w.style.display = 'none';
+        }
+      } else {
+        if (frame === rightFrame) {
+          w.style.display = 'block';
+          w.style.left = 'calc(256 / 320 * 100%)';
+          w.style.top = 'calc(' + rightY + ' / 200 * 100%)';
+        } else {
+          w.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
   //  PER-FRAME UPDATE
   // ══════════════════════════════════════════════════════════════
 
@@ -1891,6 +2003,9 @@
           boostImgs[bi].style.display = 'none';
         }
       }
+
+      // Wheel overlays
+      updateWheels();
     }
 
     // ── Multiplayer per-frame state exchange ──

@@ -4839,6 +4839,17 @@ void GetPlayerWheelHeights(long *fl, long *fr, long *r)
 	*r = rear_actual_height;
 }
 
+void GetPlayerWheelDiffs(long *fl, long *fr)
+{
+	*fl = front_left_height_difference;
+	*fr = front_right_height_difference;
+}
+
+bool IsTouchingRoad(void)
+{
+	return touching_road != FALSE;
+}
+
 // ── Chain/crane mechanic accessors ──
 
 bool IsCarOnChains(void)
