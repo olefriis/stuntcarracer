@@ -364,7 +364,7 @@
 
 /* ── Chain overlay ─────────────────────────────────────────── */
 
-#chain-img {
+#chain-clip {
   position: fixed;
   left: 50%; top: 50%;
   width: min(100vw, calc(100vh * 8 / 5));
@@ -372,9 +372,16 @@
   width: min(100dvw, calc(100dvh * 8 / 5));
   height: min(100dvh, calc(100dvw * 5 / 8));
   transform: translate(-50%, -50%);
+  overflow: hidden;
   pointer-events: none;
   z-index: 40;
   display: none;
+}
+
+#chain-img {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
   image-rendering: pixelated;
 }
 

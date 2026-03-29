@@ -512,10 +512,13 @@
     document.body.appendChild(overlay);
 
     // ── Chain overlay image (shown during crane lifting) ──
+    var chainClip = document.createElement('div');
+    chainClip.id = 'chain-clip';
     var chainImg = document.createElement('img');
     chainImg.id = 'chain-img';
     chainImg.src = 'images/chains.png';
-    document.body.appendChild(chainImg);
+    chainClip.appendChild(chainImg);
+    document.body.appendChild(chainClip);
 
     wireButtons();
     wireKeyboard();
@@ -1627,8 +1630,8 @@
   var chainReleasing = false;
 
   function updateChainCanvas() {
-    var img = document.getElementById('chain-img');
-    if (!img) return;
+    var clip = document.getElementById('chain-clip');
+    if (!clip) return;
 
     var inRace = (uiMode === UI_PRACTISE_RACE || uiMode === UI_SEASON_RACE || uiMode === UI_MP_RACE);
     var onChains = inRace && isCarOnChains();
@@ -1639,19 +1642,20 @@
       if (chainScrollOffset <= -100) {
         chainReleasing = false;
         chainScrollOffset = 0;
-        img.style.display = 'none';
+        clip.style.display = 'none';
         return;
       }
     } else if (onChains) {
       chainReleasing = true;
       chainScrollOffset = 0;
     } else {
-      img.style.display = 'none';
+      clip.style.display = 'none';
       return;
     }
 
-    img.style.display = 'block';
-    img.style.top = 'calc(50% + ' + chainScrollOffset + 'vh)';
+    clip.style.display = 'block';
+    var img = document.getElementById('chain-img');
+    img.style.top = chainScrollOffset + '%';
   }
 
   // ══════════════════════════════════════════════════════════════
