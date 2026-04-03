@@ -428,6 +428,30 @@
   z-index: 2;
 }
 
+.cockpit-damage-hole {
+  position: absolute;
+  top: 0;
+  width: calc(32 / 320 * 100%);
+  height: calc(8 / 200 * 100%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  display: none;
+}
+
+#damage-holes-overlay {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: min(100vw, calc(100vh * 8 / 5));
+  height: min(100vh, calc(100vw * 5 / 8));
+  width: min(100dvw, calc(100dvh * 8 / 5));
+  height: min(100dvh, calc(100dvw * 5 / 8));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 101;
+  display: none;
+}
+
 .cockpit-wheel {
   position: absolute;
   image-rendering: pixelated;

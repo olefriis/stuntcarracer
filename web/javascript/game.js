@@ -114,6 +114,10 @@
   var superLeague = false;
   var damageHolePosition = 10;  // 10 = fully intact, 0 = all holes
 
+  // ── Damage hole/smash overlay state ─────────────────────────
+  var prevDamageHolePosition = 10; // track changes to detect new smashes
+  var smashTimers = [];            // array of 10 timeout IDs (null = no active smash)
+
   // ── Boost flame overlay state ──────────────────────────────
   var boostFrameIndex = 0;
   var boostFrameTime = 0;
@@ -441,26 +445,7 @@
     // ── HUD: damage bar at top ──
     createHudBar('tc-hud-damage', '\u26A0\uFE0F');
 
-    // Add holes overlay to the damage bar (individual hole markers on the right)
-    (function () {
-      var track = document.querySelector('#tc-hud-damage .hud-track');
-      if (track) {
-        track.style.position = 'relative';
-        var container = document.createElement('div');
-        container.id = 'tc-hud-damage-holes';
-        container.style.cssText = 'position:absolute;right:0;top:0;height:100%;pointer-events:none;display:flex;flex-direction:row-reverse;';
-        container.style.width = '100%';
-        // Create 10 hole marker slots (right-to-left)
-        for (var i = 0; i < 10; i++) {
-          var slot = document.createElement('div');
-          slot.className = 'damage-hole-slot';
-          slot.style.cssText = 'width:10%;height:100%;box-sizing:border-box;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);border-left:1px solid rgba(255,60,60,0.4);';
-          slot.innerHTML = '<span style="color:rgba(255,80,80,0.85);font-size:min(2vh,12px);font-weight:bold;line-height:1;text-shadow:0 0 3px rgba(0,0,0,0.8);">✕</span>';
-          container.appendChild(slot);
-        }
-        track.appendChild(container);
-      }
-    })();
+
 
     // ── HUD: info box (left side) ──
     createHudBox();
@@ -492,6 +477,19 @@
       bImg.style.display = 'none';
       cockpitDiv.appendChild(bImg);
     }
+    // Damage hole/smash overlay images (10 slots, right to left)
+    var holeDiv = document.createElement('div');
+    holeDiv.id = 'damage-holes-overlay';
+    for (var di = 0; di < 10; di++) {
+      var dImg = document.createElement('img');
+      dImg.className = 'cockpit-damage-hole';
+      dImg.dataset.slot = di;
+      dImg.src = 'images/hole.png';
+      dImg.style.display = 'none';
+      dImg.style.left = 'calc(' + (264 - di * 24) + ' / 320 * 100%)';
+      holeDiv.appendChild(dImg);
+    }
+    document.body.appendChild(holeDiv);
     var cockpitCvs = document.createElement('canvas');
     cockpitCvs.id = 'cockpit-canvas';
     cockpitDiv.appendChild(cockpitCvs);
@@ -1584,6 +1582,8 @@
     }
     var co = document.getElementById('cockpit-overlay');
     if (co) co.style.display = 'none';
+    var dho = document.getElementById('damage-holes-overlay');
+    if (dho) dho.style.display = 'none';
     var cvs = document.getElementById('canvas');
     if (cvs) cvs.classList.remove('race-mode');
     delete window.gameCanvasWidth;
@@ -1613,9 +1613,12 @@
         showEls(['tc-menu']);
         var co = document.getElementById('cockpit-overlay');
         if (co) co.style.display = 'block';
+        var dho = document.getElementById('damage-holes-overlay');
+        if (dho) dho.style.display = 'block';
         var cvs = document.getElementById('canvas');
         if (cvs) cvs.classList.add('race-mode');
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake']);
+        resetDamageHoleOverlays();
         break;
       // Season overlays managed by showOverlay()
     }
@@ -1690,19 +1693,8 @@
       ctx.fillRect(dmgX, dmgY, dmgW, dmgH);
     }
 
-    // ── Holes: 10 slots across the damage bar ──
-    var holePos = getDamageHolePosition();
-    var numHoles = 10 - holePos;
-    if (numHoles > 0) {
-      var slotW = 238 / 10 * scaleX;
-      var holeH = Math.max(1, 1 * scaleY);
-      ctx.fillStyle = 'rgba(0,0,0,0.75)';
-      for (var hi = 0; hi < numHoles; hi++) {
-        // Holes appear from right to left
-        var hx = (41 + (9 - hi) * 238 / 10) * scaleX;
-        ctx.fillRect(hx, 3 * scaleY, slotW, holeH);
-      }
-    }
+    // ── Holes: image-based overlays ──
+    updateDamageHoleOverlays();
 
     // ── Speed bar ──
     var speed = getDisplaySpeed();
@@ -1717,6 +1709,75 @@
       var yHeight = Math.max(1, 2 * scaleY);
       ctx.fillStyle = '#ffff00';
       ctx.fillRect(xLeft, yTop, xRight - xLeft, yHeight);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  DAMAGE HOLE / SMASH OVERLAYS
+  // ══════════════════════════════════════════════════════════════
+
+  function updateDamageHoleOverlays() {
+    var holePos = getDamageHolePosition();
+    var numHoles = 10 - holePos;
+
+    // Detect new holes (holePos decreased since last check)
+    if (holePos < prevDamageHolePosition) {
+      // New holes appeared — show smash for each new slot
+      for (var ni = 10 - prevDamageHolePosition; ni < numHoles; ni++) {
+        showSmashAtSlot(ni);
+      }
+    } else if (holePos > prevDamageHolePosition) {
+      // Holes were repaired — clear smash timers and hide repaired slots
+      for (var ri = numHoles; ri < 10 - prevDamageHolePosition; ri++) {
+        clearSmashTimer(ri);
+        var rImg = document.querySelector('.cockpit-damage-hole[data-slot="' + ri + '"]');
+        if (rImg) rImg.style.display = 'none';
+      }
+    }
+    prevDamageHolePosition = holePos;
+
+    // Show/hide each slot
+    var slots = document.querySelectorAll('.cockpit-damage-hole');
+    for (var si = 0; si < slots.length; si++) {
+      var slot = parseInt(slots[si].dataset.slot, 10);
+      if (slot < numHoles) {
+        slots[si].style.display = 'block';
+      } else {
+        slots[si].style.display = 'none';
+      }
+    }
+  }
+
+  function showSmashAtSlot(slotIndex) {
+    var img = document.querySelector('.cockpit-damage-hole[data-slot="' + slotIndex + '"]');
+    if (!img) return;
+    img.src = 'images/smash.png';
+    img.style.display = 'block';
+    clearSmashTimer(slotIndex);
+    smashTimers[slotIndex] = setTimeout(function () {
+      img.src = 'images/hole.png';
+      smashTimers[slotIndex] = null;
+    }, 1400);
+  }
+
+  function clearSmashTimer(slotIndex) {
+    if (smashTimers[slotIndex]) {
+      clearTimeout(smashTimers[slotIndex]);
+      smashTimers[slotIndex] = null;
+    }
+  }
+
+  function resetDamageHoleOverlays() {
+    // Reset all overlays to match current damageHolePosition
+    var holePos = getDamageHolePosition();
+    var numHoles = 10 - holePos;
+    prevDamageHolePosition = holePos;
+    for (var i = 0; i < 10; i++) {
+      clearSmashTimer(i);
+      var img = document.querySelector('.cockpit-damage-hole[data-slot="' + i + '"]');
+      if (!img) continue;
+      img.src = 'images/hole.png';
+      img.style.display = (i < numHoles) ? 'block' : 'none';
     }
   }
 
