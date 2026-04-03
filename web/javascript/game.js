@@ -442,6 +442,9 @@
     element('tc-gameover-label', '');
     element('tc-gameover', 'Menu');
 
+    // ── Chain boost hint (shares game-button base) ──
+    var boostHintEl = element('chain-boost-hint', isMobile ? 'Tap \uD83D\uDD25 to drop' : 'Press boost to drop');
+
     // ── HUD: damage bar at top ──
     createHudBar('tc-hud-damage', '\u26A0\uFE0F');
 
@@ -1572,7 +1575,8 @@
     'tc-back', 'tc-start',
     'tc-left', 'tc-right', 'tc-accel', 'tc-brake', 'tc-boost',
     'tc-menu', 'tc-hud-damage', 'tc-hud-box',
-    'tc-gameover-label', 'tc-gameover'
+    'tc-gameover-label', 'tc-gameover',
+    'chain-boost-hint'
   ];
 
   function hideAllUI() {
@@ -1659,6 +1663,10 @@
     clip.style.display = 'block';
     var img = document.getElementById('chain-img');
     img.style.top = chainScrollOffset + '%';
+
+    // Show/hide "press boost to drop" hint
+    var hint = document.getElementById('chain-boost-hint');
+    if (hint) hint.style.display = isChainBoostHintVisible() ? 'flex' : 'none';
   }
 
   // ══════════════════════════════════════════════════════════════

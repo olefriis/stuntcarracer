@@ -2681,8 +2681,14 @@ static void LiftCarOntoTrack (void)
 			}
 		else
 			{
-			// Season / multiplayer: auto-drop partway through hover
-			if (car_on_chains_countdown <= 10)
+			// Season / multiplayer: boost press drops immediately,
+			// otherwise auto-drop near the end of the countdown
+			if (chain_boost_pressed)
+				{
+				should_release = true;
+				chain_boost_pressed = false;
+				}
+			else if (car_on_chains_countdown <= 10)
 				should_release = true;
 			}
 

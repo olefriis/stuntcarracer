@@ -225,7 +225,8 @@
 
 /* ── Game over / result ──────────────────────────────────── */
 
-#tc-gameover-label {
+#tc-gameover-label,
+#chain-boost-hint {
   left: 50%; top: 40%;
   width: 80vw; height: auto;
   max-width: 500px;
