@@ -468,7 +468,7 @@
         wImg.className = 'cockpit-wheel';
         wImg.dataset.side = wheelSides[wi];
         wImg.dataset.frame = wf;
-        wImg.src = 'images/' + wheelSides[wi] + '-wheel-' + wf + '.png';
+        wImg.src = 'images/wheels/' + wheelSides[wi] + '-wheel-' + wf + '.png';
         cockpitDiv.appendChild(wImg);
       }
     }
@@ -476,7 +476,7 @@
     for (var bi = 1; bi <= 3; bi++) {
       var bImg = document.createElement('img');
       bImg.className = 'cockpit-boost-img';
-      bImg.src = 'images/boost-' + bi + '.png';
+      bImg.src = 'images/boost/boost-' + bi + '.png';
       bImg.style.display = 'none';
       cockpitDiv.appendChild(bImg);
     }
@@ -487,7 +487,7 @@
       var dImg = document.createElement('img');
       dImg.className = 'cockpit-damage-hole';
       dImg.dataset.slot = di;
-      dImg.src = 'images/hole.png';
+      dImg.src = 'images/indicators/hole.png';
       dImg.style.display = 'none';
       dImg.style.left = 'calc(' + (264 - di * 24) + ' / 320 * 100%)';
       holeDiv.appendChild(dImg);
@@ -1759,11 +1759,11 @@
   function showSmashAtSlot(slotIndex) {
     var img = document.querySelector('.cockpit-damage-hole[data-slot="' + slotIndex + '"]');
     if (!img) return;
-    img.src = 'images/smash.png';
+    img.src = 'images/indicators/smash.png';
     img.style.display = 'block';
     clearSmashTimer(slotIndex);
     smashTimers[slotIndex] = setTimeout(function () {
-      img.src = 'images/hole.png';
+      img.src = 'images/indicators/hole.png';
       smashTimers[slotIndex] = null;
     }, 1400);
   }
@@ -1784,7 +1784,7 @@
       clearSmashTimer(i);
       var img = document.querySelector('.cockpit-damage-hole[data-slot="' + i + '"]');
       if (!img) continue;
-      img.src = 'images/hole.png';
+      img.src = 'images/indicators/hole.png';
       img.style.display = (i < numHoles) ? 'block' : 'none';
     }
   }
