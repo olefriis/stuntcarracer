@@ -794,6 +794,12 @@ struct MTXInterpolator
 {
 	D3DXMATRIX oldMtx, newMtx;
 
+	void Reset()
+	{
+		D3DXMatrixIdentity(&oldMtx);
+		D3DXMatrixIdentity(&newMtx);
+	}
+
 	void UpdateMatrix(const D3DXMATRIX &combinedMtx)
 	{
 		oldMtx = newMtx;
@@ -834,6 +840,11 @@ struct ViewpointInterpolator
 		if (delta > 32768)  delta -= 65536;
 		if (delta < -32768) delta += 65536;
 		return delta;
+	}
+
+	void Reset()
+	{
+		initialized = false;
 	}
 
 	void Update(long x, long y, long z, long xa, long ya, long za)
@@ -968,6 +979,13 @@ struct Ticker
 	{
 		TargetFPS = newFPS;
 		TickDuration = 1.0f / TargetFPS;
+		TickFraction = 0.0f;
+		TickPercent  = 0.0f;
+		DoFrame = true;
+	}
+
+	void Reset()
+	{
 		TickFraction = 0.0f;
 		TickPercent  = 0.0f;
 		DoFrame = true;
@@ -1765,6 +1783,11 @@ void jsStartPreview() {
     ResetPlayer();
     GameMode = TRACK_PREVIEW;
     bPlayerPaused = bOpponentPaused = FALSE;
+    InterpolatedViewpoint.Reset();
+    InterpolatorCarOwn.Reset();
+    InterpolatorCarOpponent.Reset();
+    GameTicker.Reset();
+    SoundTicker.Reset();
 }
 
 // Start a race. opponentId: 0–10 for a specific opponent, -1 for random, -2 for solo.
@@ -1790,6 +1813,11 @@ void jsStartGame(int opponentId) {
     bPlayerPaused = bOpponentPaused = FALSE;
     playerWrecked = false;
     lastInput = 0;
+    InterpolatedViewpoint.Reset();
+    InterpolatorCarOwn.Reset();
+    InterpolatorCarOpponent.Reset();
+    GameTicker.Reset();
+    SoundTicker.Reset();
 }
 
 // Return to the track menu
@@ -1799,6 +1827,11 @@ void jsGoToMenu() {
     opponentsID = NO_OPPONENT;
     soloMode = false;
     ResetDrawBridge();
+    InterpolatedViewpoint.Reset();
+    InterpolatorCarOwn.Reset();
+    InterpolatorCarOpponent.Reset();
+    GameTicker.Reset();
+    SoundTicker.Reset();
 }
 
 // Query the currently loaded track ID (-1 if none)
