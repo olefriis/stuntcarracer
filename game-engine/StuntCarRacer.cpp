@@ -793,16 +793,26 @@ long x_offset, y_offset, z_offset;
 struct MTXInterpolator
 {
 	D3DXMATRIX oldMtx, newMtx;
+	bool initialized;
 
 	void Reset()
 	{
 		D3DXMatrixIdentity(&oldMtx);
 		D3DXMatrixIdentity(&newMtx);
+		initialized = false;
 	}
 
 	void UpdateMatrix(const D3DXMATRIX &combinedMtx)
 	{
-		oldMtx = newMtx;
+		if (!initialized)
+		{
+			oldMtx = combinedMtx;
+			initialized = true;
+		}
+		else
+		{
+			oldMtx = newMtx;
+		}
 		newMtx = combinedMtx;
 	}
 
@@ -1065,8 +1075,10 @@ D3DXMATRIX matRot, matTemp, matTrans, matView;
 				//
 				// Set the view transform matrix
 				//
-				// Set the eye point
-				D3DXVECTOR3 vEyePt( (float)viewpoint1_x, (float)(-viewpoint1_y>>LOG_PRECISION), (float)viewpoint1_z );
+				// Set the eye point (interpolated to avoid 10Hz stutter)
+				long ix, iy, iz, ixa, iya, iza;
+				InterpolatedViewpoint.GetInterpolated(GameTicker.TickPercent, ix, iy, iz, ixa, iya, iza);
+				D3DXVECTOR3 vEyePt( (float)ix, (float)(-iy>>LOG_PRECISION), (float)iz );
 				// Set the lookat point
 				D3DXMATRIX carMtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
 				D3DXVECTOR3 vLookatPt( carMtx._41, carMtx._42, carMtx._43 );
@@ -1162,24 +1174,30 @@ D3DXMATRIX matRot, matTemp, matTrans, matView;
 		//
 		// Set the view transform matrix
 		//
-		// Set the eye point
-		D3DXVECTOR3 vEyePt( (float)viewpoint1_x, (float)(-viewpoint1_y>>LOG_PRECISION), (float)viewpoint1_z );
-		// Set the lookat point
 		D3DXVECTOR3 vLookatPt;
 		if (GameMode==TRACK_MENU)
 		{
+			// Set the eye point
+			D3DXVECTOR3 vEyePt( (float)viewpoint1_x, (float)(-viewpoint1_y>>LOG_PRECISION), (float)viewpoint1_z );
+			// Set the lookat point
 			vLookatPt.x = (float)target_x;
 			vLookatPt.y = (float)target_y;
 			vLookatPt.z = (float)target_z;
+			D3DXMatrixLookAtLH( &matView, &vEyePt, &vLookatPt, &vUpVec );
 		}
 		else
 		{
+			// Use interpolated eye point to stay in sync with interpolated lookat
+			long ix, iy, iz, ixa, iya, iza;
+			InterpolatedViewpoint.GetInterpolated(GameTicker.TickPercent, ix, iy, iz, ixa, iya, iza);
+			D3DXVECTOR3 vEyePt( (float)ix, (float)(-iy>>LOG_PRECISION), (float)iz );
+			// Set the lookat point
 			D3DXMATRIX carMtx = InterpolatorCarOpponent.CreateInterpolatedMtx(GameTicker.TickPercent);
 			vLookatPt.x = carMtx._41;
 			vLookatPt.y = carMtx._42;
 			vLookatPt.z = carMtx._43;
+			D3DXMatrixLookAtLH( &matView, &vEyePt, &vLookatPt, &vUpVec );
 		}
-		D3DXMatrixLookAtLH( &matView, &vEyePt, &vLookatPt, &vUpVec );
 
 		pd3dDevice->SetTransform( D3DTS_VIEW, &matView );
 	}
