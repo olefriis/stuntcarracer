@@ -1918,6 +1918,14 @@ int jsGetOpponentBestLap() { return (int)(bestLapTime[OPPONENT]); }
 EMSCRIPTEN_KEEPALIVE
 int jsIsSoloMode() { return soloMode ? 1 : 0; }
 
+// Is the player currently winning? (ahead of opponent)
+extern long StartLinePiece, NumTrackPieces;
+EMSCRIPTEN_KEEPALIVE
+int jsIsPlayerWinning() {
+    long sfp = (StartLinePiece + 1 < NumTrackPieces) ? (StartLinePiece + 1) : 0;
+    return (CalculateIfWinning(sfp) < 0) ? 1 : 0;
+}
+
 // Get display speed (0–240)
 EMSCRIPTEN_KEEPALIVE
 int jsGetDisplaySpeed() { return (int)CalculateDisplaySpeed(); }

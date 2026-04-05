@@ -306,6 +306,7 @@
   function getPlayerWheelFL()        { return Module._jsGetPlayerWheelFL(); }
   function getPlayerWheelFR()        { return Module._jsGetPlayerWheelFR(); }
   function getPlayerWheelR()         { return Module._jsGetPlayerWheelR(); }
+  function isPlayerWinning()    { return !!Module._jsIsPlayerWinning(); }
   function isCarOnChains()              { return !!Module._jsIsCarOnChains(); }
   function getChainCountdown()          { return Module._jsGetChainCountdown(); }
   function getChainFromLeft()           { return !!Module._jsGetChainSwingFromLeft(); }
@@ -480,6 +481,19 @@
       bImg.style.display = 'none';
       cockpitDiv.appendChild(bImg);
     }
+    // Flag and stopwatch indicator overlays
+    var flagImg = document.createElement('img');
+    flagImg.id = 'cockpit-flag';
+    flagImg.className = 'cockpit-indicator';
+    flagImg.src = 'images/indicators/flag-bright.png';
+    flagImg.style.display = 'none';
+    cockpitDiv.appendChild(flagImg);
+    var swImg = document.createElement('img');
+    swImg.id = 'cockpit-stopwatch';
+    swImg.className = 'cockpit-indicator';
+    swImg.src = 'images/indicators/stopwatch-bright.png';
+    swImg.style.display = 'none';
+    cockpitDiv.appendChild(swImg);
     // Damage hole/smash overlay images (10 slots, right to left)
     var holeDiv = document.createElement('div');
     holeDiv.id = 'damage-holes-overlay';
@@ -2018,6 +2032,17 @@
         for (var bi = 0; bi < boostImgs.length; bi++) {
           boostImgs[bi].style.display = 'none';
         }
+      }
+
+      // Flag indicator (bright when player is winning)
+      var flagEl = document.getElementById('cockpit-flag');
+      if (flagEl) flagEl.style.display = (!Module._jsIsSoloMode() && isPlayerWinning()) ? 'block' : 'none';
+
+      // Stopwatch indicator (bright when player has best lap)
+      var swEl = document.getElementById('cockpit-stopwatch');
+      if (swEl) {
+        var pBest = getPlayerBestLap(), oBest = getOpponentBestLap();
+        swEl.style.display = (!Module._jsIsSoloMode() && pBest > 0 && (oBest <= 0 || pBest <= oBest)) ? 'block' : 'none';
       }
 
       // Wheel overlays

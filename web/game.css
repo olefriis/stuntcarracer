@@ -429,6 +429,19 @@
   z-index: 2;
 }
 
+.cockpit-indicator {
+  position: absolute;
+  width: calc(16 / 320 * 100%);
+  height: calc(8 / 200 * 100%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#cockpit-flag      { left: calc(96 / 320 * 100%);  top: calc(190 / 200 * 100%); }
+#cockpit-stopwatch { left: calc(208 / 320 * 100%); top: calc(190 / 200 * 100%); }
+
 .cockpit-damage-hole {
   position: absolute;
   top: 0;
