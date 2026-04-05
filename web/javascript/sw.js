@@ -1,7 +1,7 @@
 // Service worker for Stunt Car Racer PWA
 // Caches game files for offline play and home-screen launch
 
-var CACHE_NAME = 'scr-v82';
+var CACHE_NAME = 'scr-v83';
 var ASSETS = [
   'source.html',
   'source.js',
@@ -26,7 +26,15 @@ var ASSETS = [
   'images/indicators/hole.png',
   'images/indicators/smash.png',
   'images/indicators/flag-bright.png',
-  'images/indicators/stopwatch-bright.png'
+  'images/indicators/stopwatch-bright.png',
+  'images/dust/dust-cloud-0.png',
+  'images/dust/dust-cloud-1.png',
+  'images/dust/dust-cloud-2.png',
+  'images/dust/dust-cloud-3.png',
+  'images/dust/dust-cloud-4.png',
+  'images/dust/dust-cloud-5.png',
+  'images/dust/dust-cloud-6.png',
+  'images/dust/dust-cloud-7.png'
 ];
 
 // Install: pre-cache core assets

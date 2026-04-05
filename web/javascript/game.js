@@ -127,6 +127,17 @@
   var wheelRotationAccum = 0;     // 16-bit accumulator; overflows trigger frame advance
   var wheelRotationSpeed = 0;     // 16-bit speed added each game frame
 
+  // ── Dust cloud particle state ──────────────────────────────
+  var DUST_COUNT = 16;
+  var DUST_FRAME_SEQ = [3,6,7,2,1,5,0,4,0,5,1,2,7,6,2,7];
+  var DUST_X_OFFSET  = [32,32,32,40,24,32,32,32]; // half-width centering per frame
+  var DUST_W = [64,64,64,80,48,64,64,64]; // pixel width per frame
+  var DUST_H = [34,31,38,36,28,34,34,36]; // pixel height per frame
+  var dustParticles = [];   // {x, y, xVel, yVel}
+  var dustFrameCounter = 0;
+  var dustActive = false;   // was dust showing last frame?
+  var dustLastTick = 0;     // timestamp of last particle update
+
   var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
   var seasonStartDamageHolePosition = null; // hole position snapshot at season start
@@ -494,6 +505,16 @@
     swImg.src = 'images/indicators/stopwatch-bright.png';
     swImg.style.display = 'none';
     cockpitDiv.appendChild(swImg);
+    // Dust cloud particle images
+    for (var di = 0; di < DUST_COUNT; di++) {
+      var dcImg = document.createElement('img');
+      dcImg.className = 'dust-cloud';
+      dcImg.dataset.idx = di;
+      dcImg.src = 'images/dust/dust-cloud-0.png';
+      dcImg.style.display = 'none';
+      cockpitDiv.appendChild(dcImg);
+      dustParticles.push({ x: 0, y: 210, xVel: 0, yVel: 0 });
+    }
     // Damage hole/smash overlay images (10 slots, right to left)
     var holeDiv = document.createElement('div');
     holeDiv.id = 'damage-holes-overlay';
@@ -1825,6 +1846,82 @@
     return Math.round(126 - offset);
   }
 
+  // ── Dust cloud particle system (matches Amiga draw.dust.clouds) ──────────
+  function updateDustClouds() {
+    var els = document.querySelectorAll('.dust-cloud');
+    if (!els.length) return;
+
+    var offMap = !!Module._jsIsOffMap();
+    var onChains = isCarOnChains();
+    var touching = isTouchingRoad();
+    // Dust only when off-map AND touching ground AND not on chains
+    var showDust = offMap && touching && !onChains;
+
+    if (!showDust) {
+      if (dustActive) {
+        for (var i = 0; i < els.length; i++) els[i].style.display = 'none';
+        dustActive = false;
+      }
+      return;
+    }
+
+    dustActive = true;
+
+    // Throttle to ~12.5 fps to match Amiga frame rate
+    var now = performance.now();
+    var tick = now - dustLastTick >= 80;
+    if (tick) dustLastTick = now;
+
+    // Ferocity from z-speed (capped at 16, matches Amiga)
+    var zs = Math.abs(getPlayerZSpeed()) >> 8;
+    var ferocity = Math.min(zs, 16);
+
+    if (tick) dustFrameCounter++;
+
+    for (var i = 0; i < DUST_COUNT; i++) {
+      var p = dustParticles[i];
+
+      if (tick) {
+        // Apply gravity (+2 per tick) and move
+        p.yVel += 2;
+        p.y += p.yVel;
+        p.x += p.xVel;
+      }
+
+      // Reset particle if off-screen (Y >= 128 or out of X range)
+      if (p.y >= 128 || p.x < 0 || p.x > 255) {
+        // Random X: 0–255, random Y: 118–125
+        p.x = Math.floor(Math.random() * 256);
+        p.y = 118 + Math.floor(Math.random() * 8);
+        // Y velocity: upward, based on ferocity + random
+        p.yVel = -(Math.floor(ferocity / 2) + Math.floor(Math.random() * 8) + 1);
+        // X velocity: derived from position
+        p.xVel = Math.floor((p.y - 128) / 8);
+      }
+
+      // Only render if within viewport (y < 128, x 0–255)
+      if (p.y < 0 || p.y >= 128 || p.x < 0 || p.x > 255) {
+        els[i].style.display = 'none';
+        continue;
+      }
+
+      // Frame selection from sequence table (matches Amiga draw.spark.sub)
+      var seqIdx = (i + dustFrameCounter) & 0xf;
+      var frame = DUST_FRAME_SEQ[seqIdx];
+
+      // Screen position in 320×200 space
+      var drawX = p.x - DUST_X_OFFSET[frame] + 32;
+      var drawY = p.y + 16;
+
+      els[i].src = 'images/dust/dust-cloud-' + frame + '.png';
+      els[i].style.left = (drawX / 320 * 100) + '%';
+      els[i].style.top = (drawY / 200 * 100) + '%';
+      els[i].style.width = (DUST_W[frame] / 320 * 100) + '%';
+      els[i].style.height = (DUST_H[frame] / 200 * 100) + '%';
+      els[i].style.display = 'block';
+    }
+  }
+
   function updateWheels() {
     var wheels = document.querySelectorAll('.cockpit-wheel');
     if (!wheels.length) return;
@@ -2047,6 +2144,9 @@
 
       // Wheel overlays
       updateWheels();
+
+      // Dust cloud particles
+      updateDustClouds();
     }
 
     // ── Multiplayer per-frame state exchange ──

@@ -4866,6 +4866,11 @@ bool IsTouchingRoad(void)
 	return touching_road != FALSE;
 }
 
+bool IsOffMap(void)
+{
+	return off_map_status != 0;
+}
+
 // ── Chain/crane mechanic accessors ──
 
 bool IsCarOnChains(void)

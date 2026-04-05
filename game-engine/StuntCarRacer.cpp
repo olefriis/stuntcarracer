@@ -2006,6 +2006,9 @@ EMSCRIPTEN_KEEPALIVE
 int jsIsTouchingRoad() { return IsTouchingRoad() ? 1 : 0; }
 
 EMSCRIPTEN_KEEPALIVE
+int jsIsOffMap() { return IsOffMap() ? 1 : 0; }
+
+EMSCRIPTEN_KEEPALIVE
 int jsGetWheelDiffFL() { long fl, fr; GetPlayerWheelDiffs(&fl, &fr); return (int)fl; }
 
 EMSCRIPTEN_KEEPALIVE

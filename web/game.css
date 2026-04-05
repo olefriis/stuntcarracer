@@ -442,6 +442,15 @@
 #cockpit-flag      { left: calc(96 / 320 * 100%);  top: calc(190 / 200 * 100%); }
 #cockpit-stopwatch { left: calc(208 / 320 * 100%); top: calc(190 / 200 * 100%); }
 
+.dust-cloud {
+  position: absolute;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  z-index: -1;
+  display: none;
+}
+
 .cockpit-damage-hole {
   position: absolute;
   top: 0;

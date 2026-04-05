@@ -66,6 +66,7 @@ extern void UpdateLapData (void);
 extern void GetPlayerWheelHeights (long *fl, long *fr, long *r);
 extern void GetPlayerWheelDiffs (long *fl, long *fr);
 extern bool IsTouchingRoad (void);
+extern bool IsOffMap (void);
 
 extern bool IsCarOnChains (void);
 extern long GetCarOnChainsCountdown (void);
