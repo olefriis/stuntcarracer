@@ -138,6 +138,11 @@
   var dustActive = false;   // was dust showing last frame?
   var dustLastTick = 0;     // timestamp of last particle update
 
+  // ── Damage bar wavy path state (matches Amiga random walk) ─
+  var damagePath = [];      // Y offsets (0-7) per damage pixel (0-239)
+  var damageShade = [];     // true = going down (lighter shade)
+  var damagePathY = 4;      // current random-walk Y position
+
   var currentDivisionAssignments = INITIAL_DIVISIONS.slice();
   var seasonStartDivisionAssignments = null; // division assignments snapshot at season start
   var seasonStartDamageHolePosition = null; // hole position snapshot at season start
@@ -1658,6 +1663,7 @@
         if (cvs) cvs.classList.add('race-mode');
         if (isMobile) showEls(['tc-left', 'tc-right', 'tc-accel', 'tc-brake']);
         resetDamageHoleOverlays();
+        resetDamagePath();
         break;
       // Season overlays managed by showOverlay()
     }
@@ -1725,15 +1731,36 @@
     var scaleX = w / 320;
     var scaleY = h / 200;
 
-    // ── Damage bar: (41,3) to (279,3), 1px high ──
-    var dmgFrac = Math.min(1, getDamage() / 240);
-    if (dmgFrac > 0) {
-      var dmgX = 41 * scaleX;
-      var dmgY = 3 * scaleY;
-      var dmgW = 238 * dmgFrac * scaleX;
-      var dmgH = Math.max(1, 1 * scaleY);
-      ctx.fillStyle = '#ff3333';
-      ctx.fillRect(dmgX, dmgY, dmgW, dmgH);
+    // ── Damage bar: wavy black line (Amiga random-walk) ──
+    var dmg = Math.min(getDamage(), 240);
+    if (dmg > 0) {
+      extendDamagePathTo(dmg);
+
+      var holePos = getDamageHolePosition();
+      var numHoles = 10 - holePos;
+      var pw = Math.max(1, Math.ceil(scaleX));
+      var ph = Math.max(1, Math.ceil(scaleY));
+
+      // Shade row first (behind the black line)
+      for (var dx = 0; dx < dmg; dx++) {
+        if (isDamagePixelInHole(40 + dx, numHoles)) continue;
+        var py = damagePath[dx];
+        if (py >= 2) {
+          ctx.fillStyle = damageShade[dx] ? '#555' : '#333';
+          ctx.fillRect((40 + dx) * scaleX, (py - 2) * scaleY, pw, ph);
+        }
+      }
+
+      // Black line: 2 rows at y and y-1
+      ctx.fillStyle = '#000';
+      for (var dx = 0; dx < dmg; dx++) {
+        if (isDamagePixelInHole(40 + dx, numHoles)) continue;
+        var py = damagePath[dx];
+        ctx.fillRect((40 + dx) * scaleX, py * scaleY, pw, ph);
+        if (py >= 1) {
+          ctx.fillRect((40 + dx) * scaleX, (py - 1) * scaleY, pw, ph);
+        }
+      }
     }
 
     // ── Holes: image-based overlays ──
@@ -1808,6 +1835,59 @@
       clearTimeout(smashTimers[slotIndex]);
       smashTimers[slotIndex] = null;
     }
+  }
+
+  // ── Wavy damage path helpers (Amiga random walk) ──────────
+
+  function resetDamagePath() {
+    damagePath = [];
+    damageShade = [];
+    damagePathY = 4;
+  }
+
+  function extendDamagePathTo(len) {
+    while (damagePath.length < len) {
+      var idx = damagePath.length;
+      var y = damagePathY;
+      var oldY = y;
+
+      // Only update Y on even indices (every other pixel)
+      if (idx % 2 === 0) {
+        var r = Math.random();
+        if (r >= 0.5) {
+          // 50%: try to change direction
+          if (r >= 0.75) {
+            // 25% total: try increment (up)
+            if (y < 5) {
+              y++;
+            } else {
+              // Already high — 50% redirect to decrement, 50% no change
+              if (Math.random() < 0.5) y--;
+            }
+          } else {
+            // 25% total: try decrement (down)
+            if (y >= 3) {
+              y--;
+            } else {
+              // Already low — 50% redirect to increment, 50% no change
+              if (Math.random() < 0.5) y++;
+            }
+          }
+        }
+      }
+
+      damageShade.push(y > oldY);
+      damagePathY = y;
+      damagePath.push(y & 7);
+    }
+  }
+
+  function isDamagePixelInHole(screenX, numHoles) {
+    for (var hi = 0; hi < numHoles; hi++) {
+      var holeLeft = 264 - hi * 24;
+      if (screenX >= holeLeft && screenX < holeLeft + 10) return true;
+    }
+    return false;
   }
 
   function resetDamageHoleOverlays() {

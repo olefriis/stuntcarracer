@@ -13,9 +13,9 @@ A race is three laps. You have a limited amount of boost that you can apply free
 As you crash into the track and the ground outside the track, your car is damaged, and
 your car can only take a certain amount of damage before it is wrecked (and you lose
 the race). If your car takes a certain amount of damage in a single crash, your car
-gets a "hole" in addition to added damage. Holes only have cosmetic impact, as they
-limit the visibility of the damage bar. A car can have at most 10 holes, in which case
-the whole damage bar is barely visible.
+your car gets a "hole" in addition to added damage. Holes cause the damage bar to
+fast-forward through hole regions, effectively increasing damage received. A car can
+have at most 10 holes, in which case damage accumulates very quickly.
 
 Boost and damage are reset between races, while "holes" persist between races in Season
 / Tournament mode - see below.
