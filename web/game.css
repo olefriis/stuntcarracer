@@ -451,6 +451,15 @@
   display: none;
 }
 
+.spark-particle {
+  position: absolute;
+  width: calc(2 / 320 * 100%);
+  height: calc(2 / 200 * 100%);
+  pointer-events: none;
+  z-index: 0;
+  display: none;
+}
+
 .cockpit-damage-hole {
   position: absolute;
   top: 0;

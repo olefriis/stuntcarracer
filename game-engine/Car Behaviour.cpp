@@ -4415,6 +4415,17 @@ static void DrawDustClouds (void)
 }
 
 /*	======================================================================================= */
+/*	Function:		GetSparkFerocity														*/
+/*	======================================================================================= */
+
+static long cached_spark_ferocity = 0;
+
+long GetSparkFerocity (void)
+{
+	return cached_spark_ferocity;
+}
+
+/*	======================================================================================= */
 /*	Function:		DrawSparks																*/
 /*																							*/
 /*	Description:				*/
@@ -4423,6 +4434,8 @@ static void DrawDustClouds (void)
 static void DrawSparks (void)
 {
 int p;
+
+	cached_spark_ferocity = 0;
 
 	// currently just plays the sound effect
 
@@ -4440,6 +4453,7 @@ on_an_edge:
 
 	if (p > 50) p = 50;		// set to maximum
 	// ferocity.of.sparks.or.clouds = p
+	cached_spark_ferocity = p;
 
 	p >>= 1;
 	if (p > 31) p = 31;
@@ -4452,7 +4466,10 @@ on_an_edge:
 	WreckSoundBuffer->SetFrequency(AMIGA_PAL_HZ / p);
 
 	if (!touching_road)
+		{
+		cached_spark_ferocity = 0;
 		return;
+		}
 
 //	WreckSoundBuffer->SetCurrentPosition(0);
 	WreckSoundBuffer->Play(NULL,NULL,NULL);	// not looping

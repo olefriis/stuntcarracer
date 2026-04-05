@@ -138,6 +138,11 @@
   var dustActive = false;   // was dust showing last frame?
   var dustLastTick = 0;     // timestamp of last particle update
 
+  // ── Spark particle state ───────────────────────────────────
+  var SPARK_COUNT = 24;
+  var sparkParticles = [];  // {x, y, yVel, xVel, color}
+  var sparkLastTick = 0;
+
   // ── Damage bar wavy path state (matches Amiga random walk) ─
   var damagePath = [];      // Y offsets (0-7) per damage pixel (0-239)
   var damageShade = [];     // true = going down (lighter shade)
@@ -328,6 +333,7 @@
   function getChainFromLeft()           { return !!Module._jsGetChainSwingFromLeft(); }
   function isChainBoostHintVisible()    { return !!Module._jsIsChainBoostHintVisible(); }
   function isTouchingRoad()             { return !!Module._jsIsTouchingRoad(); }
+  function getSparkFerocity()            { return Module._jsGetSparkFerocity(); }
   function getWheelDiffFL()             { return Module._jsGetWheelDiffFL(); }
   function getWheelDiffFR()             { return Module._jsGetWheelDiffFR(); }
   function setOpponentState(rs, dist, xPos, zSpd, wFL, wFR, wR) {
@@ -519,6 +525,15 @@
       dcImg.style.display = 'none';
       cockpitDiv.appendChild(dcImg);
       dustParticles.push({ x: 0, y: 210, xVel: 0, yVel: 0 });
+    }
+    // Spark particle elements
+    for (var si = 0; si < SPARK_COUNT; si++) {
+      var sp = document.createElement('div');
+      sp.className = 'spark-particle';
+      sp.dataset.idx = si;
+      sp.style.display = 'none';
+      cockpitDiv.appendChild(sp);
+      sparkParticles.push({ x: 160, y: 200, yVel: 0, xVel: 0, color: '#fff', life: 0 });
     }
     // Damage hole/smash overlay images (10 slots, right to left)
     var holeDiv = document.createElement('div');
@@ -2002,6 +2017,57 @@
     }
   }
 
+  // ── Spark particle system (matches Amiga draw.sparks) ────────────────────
+  function updateSparks() {
+    var els = document.querySelectorAll('.spark-particle');
+    if (!els.length) return;
+
+    var ferocity = getSparkFerocity();
+
+    // Throttle physics to ~12.5 fps (80ms) to match Amiga frame rate
+    var now = performance.now();
+    var tick = now - sparkLastTick >= 80;
+    if (tick) sparkLastTick = now;
+
+    // Visible area: x=32..287, y=16..143 in native 320×200 coords
+    var VIEW_LEFT = 32, VIEW_RIGHT = 288, VIEW_TOP = 16, VIEW_BOTTOM = 144;
+    var anyAlive = false;
+
+    for (var i = 0; i < SPARK_COUNT; i++) {
+      var p = sparkParticles[i];
+
+      if (tick && p.life > 0) {
+        p.yVel += 0.7;     // gentle gravity
+        p.y += p.yVel;
+        p.x += p.xVel;
+        p.life--;
+      }
+
+      // Dead or out of bounds — try to respawn only when ferocity > 0
+      if (p.life <= 0 || p.y >= VIEW_BOTTOM || p.y < VIEW_TOP ||
+          p.x < VIEW_LEFT || p.x >= VIEW_RIGHT) {
+        if (ferocity > 0 && tick && Math.random() < 0.3) {
+          p.x = VIEW_LEFT + 32 + Math.floor(Math.random() * 128);
+          p.y = VIEW_BOTTOM - 8 + Math.floor(Math.random() * 6);
+          p.yVel = -(ferocity / 8 + Math.random() * 4 + 1);
+          p.xVel = (Math.random() - 0.5) * 3;
+          // Amiga palette: color 15 = white, color 3 = yellow
+          p.color = Math.random() < 0.5 ? '#fff' : '#ff0';
+          p.life = 8 + Math.floor(Math.random() * 12);
+        } else {
+          els[i].style.display = 'none';
+          continue;
+        }
+      }
+
+      anyAlive = true;
+      els[i].style.left = (p.x / 320 * 100) + '%';
+      els[i].style.top = (p.y / 200 * 100) + '%';
+      els[i].style.backgroundColor = p.color;
+      els[i].style.display = 'block';
+    }
+  }
+
   function updateWheels() {
     var wheels = document.querySelectorAll('.cockpit-wheel');
     if (!wheels.length) return;
@@ -2227,6 +2293,9 @@
 
       // Dust cloud particles
       updateDustClouds();
+
+      // Spark particles
+      updateSparks();
     }
 
     // ── Multiplayer per-frame state exchange ──
